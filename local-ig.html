@@ -3703,13 +3703,18 @@ function renderTagEditor(alb, container){
     const l2s=new Set();
     const grp=getEffectiveHierarchy().find(g=>tagName(g.l1)===l1v);
     if(grp?.children) grp.children.forEach(c=>l2s.add(tagName(c.l2)));
-    if(!grp?._useCountryMap){
-      S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
-        if(!tag.startsWith(l1v+'/')) return;
-        const l2part=tag.slice(l1v.length+1);
-        if(!l2part.includes('/')) l2s.add(l2part); // 排除 L3
-      }));
-    }
+    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
+      if(!tag.startsWith(l1v+'/')) return;
+      const l2part=tag.slice(l1v.length+1);
+      if(l2part.includes('/')) return; // 排除 L3
+      // _useCountryMap 分組：跳過自動生成的國家名
+      if(grp?._useCountryMap){
+        const isAutoCountry=COUNTRY_MAP.some(e=>
+          ['zh','zh-TW','zh-CN','en','ja','ko','th'].some(lang=>e[lang]===l2part));
+        if(isAutoCountry) return;
+      }
+      l2s.add(l2part);
+    }));
     l2s.forEach(v=>{const o=document.createElement('option');o.value=v;dl2.appendChild(o);});
   };
 
