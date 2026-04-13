@@ -3706,14 +3706,7 @@ function renderTagEditor(alb, container){
     S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
       if(!tag.startsWith(l1v+'/')) return;
       const l2part=tag.slice(l1v.length+1);
-      if(l2part.includes('/')) return; // 排除 L3
-      // _useCountryMap 分組：跳過自動生成的國家名
-      if(grp?._useCountryMap){
-        const isAutoCountry=COUNTRY_MAP.some(e=>
-          ['zh','zh-TW','zh-CN','en','ja','ko','th'].some(lang=>e[lang]===l2part));
-        if(isAutoCountry) return;
-      }
-      l2s.add(l2part);
+      if(!l2part.includes('/')) l2s.add(l2part); // 排除 L3，其餘都顯示
     }));
     l2s.forEach(v=>{const o=document.createElement('option');o.value=v;dl2.appendChild(o);});
   };
