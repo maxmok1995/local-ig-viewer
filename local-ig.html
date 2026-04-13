@@ -2496,10 +2496,12 @@ function updateMediaBtn(){
 // 從地點字串反查 COUNTRY_MAP，回傳當前語言國家顯示名（找不到回傳 null）
 function locToCountry(loc){
   if(!loc) return null;
-  const l=loc.toLowerCase();
+  const l=loc.toLowerCase().trim();
   for(const entry of COUNTRY_MAP){
-    if(entry.kw.some(kw=>l.includes(kw.toLowerCase())||kw.toLowerCase().includes(l)))
-      return tagName(entry);
+    if(entry.kw.some(kw=>{
+      const k=kw.toLowerCase();
+      return k===l||(k.length>=3&&l.includes(k));
+    })) return tagName(entry);
   }
   return null;
 }
@@ -2550,7 +2552,9 @@ function applyLocationL2(alb, newLoc, oldLoc){
 }
 
 function cleanupStaleLocationTags(){
-  const countryNames=new Set(COUNTRY_MAP.map(e=>tagName(e)));
+  // 用所有語言變體判斷，避免語言切換時誤刪
+  const isCountry=(name)=>COUNTRY_MAP.some(e=>
+    ['zh','zh-TW','zh-CN','en','ja','ko','th'].some(lang=>e[lang]===name));
   // 不再有 _useLocationAsL2 的 L1（山海、周末）
   const cleanL1s=new Set(
     getEffectiveHierarchy()
@@ -2575,8 +2579,8 @@ function cleanupStaleLocationTags(){
       // 山海/周末：移除與 location 相同的自動 L2
       if(cleanL1s.has(l1)&&rest===loc&&loc){dirty=true;return false;}
 
-      // 旅行：移除非國家的 L2
-      if(travelL1&&l1===travelL1&&!countryNames.has(rest)){dirty=true;return false;}
+      // 旅行：移除非國家的 L2（用所有語言變體比對）
+      if(travelL1&&l1===travelL1&&!isCountry(rest)){dirty=true;return false;}
 
       return true;
     });
@@ -3341,7 +3345,11 @@ const TagManager=(function(){
     kDiv.appendChild(_mk('div','tmInpLabel','偵測關鍵字（逗號分隔，可選）'));
     const kInp=_mk('input','tmInp');kInp.placeholder='如 music, concert';
     kDiv.appendChild(kInp);
-    addRow.append(nDiv,kDiv);
+    const l2InitDiv=_mk('div');
+    l2InitDiv.appendChild(_mk('div','tmInpLabel','初始 L2（逗號分隔，可選）'));
+    const l2InitInp=_mk('input','tmInp');l2InitInp.placeholder='如 早餐, 午餐, 晚餐';
+    l2InitDiv.appendChild(l2InitInp);
+    addRow.append(nDiv,kDiv,l2InitDiv);
     foot.appendChild(addRow);
     const addBtns=_mk('div','tmEditBtns');
     addBtns.style.marginTop='8px';
@@ -3349,12 +3357,16 @@ const TagManager=(function(){
     addBtn.addEventListener('click',()=>{
       const n=nInp.value.trim();if(!n){nInp.focus();return;}
       const kws=kInp.value.split(',').map(k=>k.trim()).filter(Boolean);
+      const initL2s=l2InitInp.value.split(',').map(s=>s.trim()).filter(Boolean);
       const c2=loadTagConfig();
-      c2.custom=[...(c2.custom||[]),{name:n,kw:kws}];
-      saveTagConfig(c2);nInp.value='';kInp.value='';
+      c2.custom=[...(c2.custom||[]),{
+        name:n,kw:kws,
+        children:initL2s.map(name=>({l2:{zh:name,en:name,th:name,ja:name,ko:name},kw:[]}))
+      }];
+      saveTagConfig(c2);nInp.value='';kInp.value='';l2InitInp.value='';
       refreshHomeFilter();_render();
     });
-    [nInp,kInp].forEach(inp=>inp.addEventListener('keydown',e=>{
+    [nInp,kInp,l2InitInp].forEach(inp=>inp.addEventListener('keydown',e=>{
       if(e.key==='Enter'){e.preventDefault();addBtn.click();}
     }));
     addBtns.appendChild(addBtn);
@@ -3691,9 +3703,13 @@ function renderTagEditor(alb, container){
     const l2s=new Set();
     const grp=getEffectiveHierarchy().find(g=>tagName(g.l1)===l1v);
     if(grp?.children) grp.children.forEach(c=>l2s.add(tagName(c.l2)));
-    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
-      if(tag.startsWith(l1v+'/')) l2s.add(tag.slice(l1v.length+1));
-    }));
+    if(!grp?._useCountryMap){
+      S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
+        if(!tag.startsWith(l1v+'/')) return;
+        const l2part=tag.slice(l1v.length+1);
+        if(!l2part.includes('/')) l2s.add(l2part); // 排除 L3
+      }));
+    }
     l2s.forEach(v=>{const o=document.createElement('option');o.value=v;dl2.appendChild(o);});
   };
 
