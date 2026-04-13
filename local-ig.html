@@ -152,6 +152,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 
 /* ── Album feed ───────────────────────────────────────────── */
 #vAlbum{max-width:700px;margin:0 auto;padding-bottom:60px}
+#albumNav{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:6px 12px;background:rgba(10,10,10,.6);
+  border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);
+}
+#albumNav button{font-size:18px;line-height:1;padding:2px 8px}
+#albumNavIdx{min-width:60px;text-align:center}
 .albumMeta{padding:18px 16px;border-bottom:1px solid var(--border);margin-bottom:3px}
 .albumMetaTitle{
   font-size:20px;font-weight:700;background:none;border:none;
@@ -917,7 +924,12 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
   background:var(--s2);border-radius:10px;padding:3px 10px;
   border:1px solid var(--border);
 }
-#btnTimeline.active{background:var(--accent);border-color:var(--accent);color:#fff}
+#btnTimeline.active,#btnMap.active{background:var(--accent);border-color:var(--accent);color:#fff}
+#mapView{width:100%;height:calc(100vh - 120px);min-height:400px}
+#mapLegend{padding:8px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);background:var(--bg)}
+.map-popup{font-size:13px;line-height:1.5;max-width:200px}
+.map-popup strong{display:block;margin-bottom:4px}
+.map-popup a{color:var(--accent);text-decoration:none}
 
 /* ── Delete confirm dialog ───────────────────────────────── */
 #deleteConfirmOverlay{
@@ -941,6 +953,7 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
 #deleteOkBtn{background:#c0392b;color:#fff}
 #deleteOkBtn:hover{opacity:.85}
 </style>
+<!-- Leaflet (loaded on demand) -->
 </head>
 <body>
 
@@ -951,6 +964,7 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
   <button class="hbtn" id="btnViewToggle" style="display:none">九宫格</button>
   <button class="hbtn" id="btnSort" style="display:none">↓ 倒序</button>
   <button class="hbtn" id="btnTimeline" style="display:none" title="時間軸視圖">📅</button>
+  <button class="hbtn" id="btnMap" style="display:none" title="地圖視圖">🗺</button>
   <button class="hbtn" id="btnMediaFilter" style="display:none">全部</button>
   <button class="hbtn" id="btnQuickIG" style="display:none" title="快捷更新 IG">📥</button>
   <button class="hbtn" id="btnRefresh" style="display:none" title="重新掃描，同步文件夾內容">↻</button>
@@ -1123,8 +1137,20 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
 <!-- Home grid -->
 <div class="view" id="vHome"></div>
 
+<!-- Map view -->
+<div class="view" id="vMap">
+  <div id="mapView"></div>
+  <div id="mapLegend">點擊圖釘查看相冊</div>
+</div>
+
 <!-- Album feed -->
-<div class="view" id="vAlbum"></div>
+<div class="view" id="vAlbum">
+  <div id="albumNav" style="display:none">
+    <button id="albumNavPrev" class="hbtn ghost">‹</button>
+    <span id="albumNavIdx"></span>
+    <button id="albumNavNext" class="hbtn ghost">›</button>
+  </div>
+</div>
 
 <!-- Lightbox -->
 <div class="view" id="vLB">
@@ -1895,6 +1921,8 @@ const S = {
   batchMode:false,
   batchSelected:new Set(),
   timelineMode:false,
+  mapMode:false,
+  activeLocation:null,
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────
@@ -2478,8 +2506,8 @@ function toast(msg,dur=2400){
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function showView(name){
-  ['vWelcome','vRestore','vHome','vAlbum','vLB'].forEach(id=>$(id).classList.remove('on'));
-  $({welcome:'vWelcome',restore:'vRestore',home:'vHome',album:'vAlbum',lb:'vLB'}[name]).classList.add('on');
+  ['vWelcome','vRestore','vHome','vMap','vAlbum','vLB'].forEach(id=>$(id).classList.remove('on'));
+  $({welcome:'vWelcome',restore:'vRestore',home:'vHome',map:'vMap',album:'vAlbum',lb:'vLB'}[name]).classList.add('on');
   S.view=name;
 }
 function isVideoAlbum(alb){
@@ -2606,6 +2634,8 @@ function goHome(){
   btnSort.style.display='';updateSortBtn();
   $('btnTimeline').style.display='';
   $('btnTimeline').classList.toggle('active',S.timelineMode);
+  $('btnMap').style.display='';
+  $('btnMap').classList.toggle('active',S.mapMode);
   btnMediaFilter.style.display='';updateMediaBtn();
   $('btnRefresh').style.display='';
   $('btnTranslate').style.display='';
@@ -2621,12 +2651,25 @@ function goAlbum(alb){
   btnBack.style.display='';btnViewToggle.style.display='';
   btnSort.style.display='none';btnMediaFilter.style.display='none';
   $('btnTimeline').style.display='none';
+  $('btnMap').style.display='none';
   $('btnRefresh').style.display='';
   $('btnTranslate').style.display='';
   $('btnBackup').style.display='';
   $('btnAddPosts').style.display='';
   btnOpen.style.display='none';updateGridBtn();
   $('hdr').style.display='';
+  updateAlbumNav();
+}
+
+function updateAlbumNav(){
+  const nav=$('albumNav');if(!nav) return;
+  const list=getFilteredAlbums();
+  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
+  if(idx===-1||list.length<=1){nav.style.display='none';return;}
+  nav.style.display='';
+  $('albumNavIdx').textContent=`${idx+1} / ${list.length}`;
+  $('albumNavPrev').disabled=idx===0;
+  $('albumNavNext').disabled=idx===list.length-1;
 }
 
 function updateGridBtn(){
@@ -2689,6 +2732,7 @@ function getFilteredAlbums(){
       return true;
     });
   }
+  if(S.activeLocation) result=result.filter(alb=>alb.location===S.activeLocation);
   if(S.mediaFilter==='video') result=result.filter(isVideoAlbum);
   else if(S.mediaFilter==='photo') result=result.filter(alb=>!isVideoAlbum(alb));
   return [...result].sort((a,b)=>{
@@ -2850,7 +2894,7 @@ function buildFilterBar(){
   const favCount=S.albums.filter(a=>store.getFav(a.name)).length;
   if(!allEntries.length&&!hasUntagged&&!favCount){bar.style.display='none';return bar;}
 
-  bar.appendChild(mkChip(t('filterAll'),!S.activeTags.size&&!S.showFavOnly,()=>{S.activeTags.clear();S.showFavOnly=false;refreshHomeFilter();}));
+  bar.appendChild(mkChip(t('filterAll'),!S.activeTags.size&&!S.showFavOnly&&!S.activeLocation,()=>{S.activeTags.clear();S.showFavOnly=false;S.activeLocation=null;refreshHomeFilter();}));
   if(favCount){
     const favChip=mkChip(`⭐ 收藏 ${favCount}`,S.showFavOnly,()=>{
       S.showFavOnly=!S.showFavOnly;
@@ -2934,6 +2978,28 @@ function buildFilterBar(){
     });
     uc.style.cssText='opacity:.6;border-style:dashed';
     bar.appendChild(uc);
+  }
+
+  // 📍 地點篩選 chips
+  const locCounts=new Map();
+  S.albums.forEach(alb=>{if(alb.location) locCounts.set(alb.location,(locCounts.get(alb.location)||0)+1);});
+  if(locCounts.size>0){
+    const locRow=document.createElement('div');
+    locRow.className='l2row';locRow.style.cssText='width:100%;margin:2px 0 0 0;';
+    const locLabel=document.createElement('span');
+    locLabel.textContent='📍';locLabel.style.cssText='font-size:11px;opacity:.5;flex-shrink:0';
+    locRow.appendChild(locLabel);
+    const sortedLocs=[...locCounts.entries()].sort((a,b)=>b[1]-a[1]);
+    sortedLocs.forEach(([loc,cnt])=>{
+      const active=S.activeLocation===loc;
+      const chip=mkChip(`${loc} ${cnt}`,active,()=>{
+        S.activeLocation=active?null:loc;
+        refreshHomeFilter();
+      });
+      chip.style.cssText='font-size:11px;padding:1px 7px';
+      locRow.appendChild(chip);
+    });
+    bar.appendChild(locRow);
   }
 
   // ⚙ 管理按鈕（靠右）
@@ -3464,7 +3530,7 @@ function buildCard(alb){
   // 地点：单独一行，比 aMeta 更醒目
   if(alb.location){
     const locEl=document.createElement('div');locEl.className='cardLoc';
-    locEl.innerHTML=`<span style="opacity:.7">📍</span><span>${esc(alb.location)}</span>`;
+    locEl.innerHTML=`<span style="opacity:.7">📍</span><span>${S.searchQuery?hlText(alb.location,S.searchQuery):esc(alb.location)}</span>`;
     ov.appendChild(locEl);
   }
   const meta=[];
@@ -3475,7 +3541,9 @@ function buildCard(alb){
   metaCount.dataset.iv=alb.postMeta?.is_video?'1':'';
   metaCount.dataset.extra=meta.join('  ');
   metaCount.textContent=mediaLabel(alb.photos,alb.postMeta)+(meta.length?' · '+meta.join('  '):'');
-  const aName=document.createElement('div');aName.className='aName';aName.textContent=alb.title;
+  const aName=document.createElement('div');aName.className='aName';
+  if(S.searchQuery){aName.innerHTML=hlText(alb.title,S.searchQuery);}
+  else{aName.textContent=alb.title;}
   ov.appendChild(aName);ov.appendChild(metaCount);
   card.appendChild(ov);
   // 多選用的勾選圓圈
@@ -4601,11 +4669,180 @@ btnSort.addEventListener('click',()=>{
 
 $('btnTimeline').addEventListener('click',()=>{
   S.timelineMode=!S.timelineMode;
+  if(S.timelineMode) S.mapMode=false;
   $('btnTimeline').classList.toggle('active',S.timelineMode);
+  $('btnMap').classList.toggle('active',S.mapMode);
   renderHome();
 });
 
+// ── 地圖視圖 ──────────────────────────────────────────────────────────────
+let _leafletLoaded=false;
+let _leafletMap=null;
+const GEO_CACHE_KEY='local-ig-geocache';
+
+function getGeoCache(){try{return JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}')}catch{return{}}}
+function setGeoCache(cache){try{localStorage.setItem(GEO_CACHE_KEY,JSON.stringify(cache))}catch{}}
+
+async function geocodeLocation(loc){
+  if(!loc) return null;
+  const cache=getGeoCache();
+  if(cache[loc]) return cache[loc];
+  try{
+    const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`;
+    const res=await fetch(url,{headers:{'Accept-Language':'zh-TW,zh;q=0.9,en;q=0.8'}});
+    const data=await res.json();
+    if(data&&data[0]){
+      const r={lat:parseFloat(data[0].lat),lng:parseFloat(data[0].lon)};
+      cache[loc]=r;setGeoCache(cache);return r;
+    }
+    cache[loc]=null;setGeoCache(cache);return null;
+  }catch{return null;}
+}
+
+async function loadLeaflet(){
+  if(_leafletLoaded) return;
+  await new Promise((resolve,reject)=>{
+    const link=document.createElement('link');
+    link.rel='stylesheet';link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const script=document.createElement('script');
+    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=resolve;script.onerror=reject;
+    document.head.appendChild(script);
+  });
+  _leafletLoaded=true;
+}
+
+async function renderMapView(){
+  const mapEl=$('mapView');
+  if(!mapEl) return;
+
+  // 顯示 loading
+  mapEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px">🗺 正在載入地圖與地點資料…</div>';
+
+  try{ await loadLeaflet(); }
+  catch{mapEl.innerHTML='<div style="padding:20px;color:#e74c3c">無法載入 Leaflet 地圖（請確認網路連線）</div>';return;}
+
+  // 收集所有有地點的相冊（去重 location）
+  const locMap=new Map(); // location -> [alb, ...]
+  S.albums.forEach(alb=>{
+    if(!alb.location) return;
+    if(!locMap.has(alb.location)) locMap.set(alb.location,[]);
+    locMap.get(alb.location).push(alb);
+  });
+
+  if(locMap.size===0){
+    mapEl.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center">目前沒有含地點資訊的相冊</div>';
+    return;
+  }
+
+  // 初始化地圖（清掉舊的）
+  mapEl.innerHTML='';
+  mapEl.style.background='';
+  if(_leafletMap){_leafletMap.remove();_leafletMap=null;}
+  const L=window.L;
+  _leafletMap=L.map(mapEl,{zoomControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19
+  }).addTo(_leafletMap);
+
+  const markers=[];
+  let done=0;
+  const total=locMap.size;
+  const RATE_MS=250; // Nominatim rate limit
+
+  for(const [loc,albs] of locMap.entries()){
+    await new Promise(r=>setTimeout(r,done===0?0:RATE_MS));
+    const coord=await geocodeLocation(loc);
+    done++;
+    $('mapLegend').textContent=`正在搜尋座標… ${done}/${total}`;
+    if(!coord) continue;
+
+    const mkIcon=()=>L.divIcon({
+      className:'',
+      html:`<div style="background:var(--accent,#e74c3c);border:2px solid #fff;border-radius:50%;width:12px;height:12px;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
+      iconSize:[12,12],iconAnchor:[6,6]
+    });
+
+    const popupHtml=albs.slice(0,5).map(alb=>{
+      const thumb=alb.photos[alb.coverPhoto||0];
+      const imgSrc=thumb?`<img src="" data-name="${alb.name}" data-photo="${alb.coverPhoto||0}" style="width:100%;height:80px;object-fit:cover;border-radius:4px;margin-bottom:4px;display:block">`:'' ;
+      return `<div class="map-popup">${imgSrc}<strong>${esc(alb.title||alb.name)}</strong><a href="#" data-alb="${alb.name}" style="font-size:11px;color:var(--accent)">查看相冊 →</a></div>`;
+    }).join('<hr style="margin:4px 0;opacity:.2">') + (albs.length>5?`<div style="font-size:11px;opacity:.6;margin-top:4px">…還有 ${albs.length-5} 個相冊</div>`:'');
+
+    const marker=L.marker([coord.lat,coord.lng],{icon:mkIcon(),title:loc})
+      .bindPopup(popupHtml,{maxWidth:220})
+      .addTo(_leafletMap);
+    marker._albNames=albs.map(a=>a.name);
+    marker._loc=loc;
+    markers.push(marker);
+  }
+
+  if(markers.length===0){
+    $('mapLegend').textContent='無法取得任何地點座標（Nominatim 搜尋失敗）';
+    return;
+  }
+
+  // 自動 fitBounds
+  const group=L.featureGroup(markers);
+  _leafletMap.fitBounds(group.getBounds().pad(0.2));
+  $('mapLegend').textContent=`${markers.length} 個地點 · 點擊圖釘查看相冊`;
+
+  // popup 裡的「查看相冊」連結
+  $('vMap').addEventListener('click',e=>{
+    const a=e.target.closest('a[data-alb]');
+    if(!a) return;
+    e.preventDefault();
+    const alb=S.albums.find(x=>x.name===a.dataset.alb);
+    if(alb){S.mapMode=false;$('btnMap').classList.remove('active');goAlbum(alb);}
+  },{once:false});
+
+  // 載入 popup 縮圖（Leaflet popupopen 事件）
+  _leafletMap.on('popupopen',()=>{
+    mapEl.querySelectorAll('img[data-name]').forEach(async img=>{
+      if(img._loaded) return;img._loaded=true;
+      const alb=S.albums.find(a=>a.name===img.dataset.name);
+      if(!alb||!S.rootDirHandle) return;
+      const photoIdx=parseInt(img.dataset.photo)||0;
+      const photo=alb.photos[photoIdx];
+      if(!photo) return;
+      try{
+        const fh=await S.rootDirHandle.getDirectoryHandle(alb.name);
+        const ph=await fh.getFileHandle(photo.filename);
+        const f=await ph.getFile();
+        img.src=URL.createObjectURL(f);
+      }catch{}
+    });
+  });
+}
+
+$('btnMap').addEventListener('click',()=>{
+  S.mapMode=!S.mapMode;
+  if(S.mapMode) S.timelineMode=false;
+  $('btnMap').classList.toggle('active',S.mapMode);
+  $('btnTimeline').classList.toggle('active',S.timelineMode);
+  if(S.mapMode){
+    showView('map');
+    renderMapView();
+  } else {
+    showView('home');
+    renderHome();
+  }
+});
+
 $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
+
+$('albumNavPrev').addEventListener('click',()=>{
+  const list=getFilteredAlbums();
+  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
+  if(idx>0) goAlbum(list[idx-1]);
+});
+$('albumNavNext').addEventListener('click',()=>{
+  const list=getFilteredAlbums();
+  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
+  if(idx<list.length-1) goAlbum(list[idx+1]);
+});
 
 // ── 翻譯 Modal ────────────────────────────────────────────────────────────
 (function(){
@@ -4907,6 +5144,10 @@ document.addEventListener('keydown',e=>{
     if(e.key==='ArrowRight')lbMove(1);
     if(e.key==='Escape')closeLB();
   }
+  if(S.view==='map'&&e.key==='Escape'){
+    S.mapMode=false;$('btnMap').classList.remove('active');
+    showView('home');renderHome();
+  }
 });
 // 觸控滑動已移至 lbImgArea（覆蓋更大面積），見文件末 "Lightbox 手勢滑動" 區段
 
@@ -4925,6 +5166,15 @@ function fmtNum(n){
 }
 function esc(s){
   return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+// 搜尋結果高亮（遞歸，支持多處命中）
+function hlText(text,q){
+  if(!q||!text) return esc(text||'');
+  const i=text.toLowerCase().indexOf(q.toLowerCase());
+  if(i===-1) return esc(text);
+  return esc(text.slice(0,i))+
+    `<mark style="background:rgba(255,210,0,.35);color:inherit;border-radius:2px">${esc(text.slice(i,i+q.length))}</mark>`+
+    hlText(text.slice(i+q.length),q);
 }
 // 自動偵測 HTML 文件所在目錄（適配換電腦）
 function getHtmlDir(){
