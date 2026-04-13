@@ -2981,14 +2981,27 @@ function buildFilterBar(){
   }
 
   // 📍 地點篩選 chips
+  // 📍 地點篩選（摺疊式）
   const locCounts=new Map();
   S.albums.forEach(alb=>{if(alb.location) locCounts.set(alb.location,(locCounts.get(alb.location)||0)+1);});
   if(locCounts.size>0){
+    const hasActiveLoc=!!S.activeLocation;
+    // 若目前有篩選地點，預設展開；否則摺疊
+    const locExpanded=hasActiveLoc||S._locRowExpanded||false;
+
+    // 觸發行（📍 toggle 按鈕）
+    const locToggle=document.createElement('button');
+    locToggle.className='hbtn ghost';
+    const activeLocLabel=S.activeLocation?` · ${S.activeLocation}`:'';
+    locToggle.innerHTML=`📍<span style="font-size:11px;opacity:.6"> ${locCounts.size}個地點${activeLocLabel}</span> <span style="font-size:10px;opacity:.4">${locExpanded?'▴':'▾'}</span>`;
+    locToggle.style.cssText='font-size:12px;padding:2px 8px;flex-shrink:0';
+    if(hasActiveLoc) locToggle.style.borderColor='var(--accent)';
+    bar.appendChild(locToggle);
+
+    // 地點 chips 行（預設摺疊）
     const locRow=document.createElement('div');
-    locRow.className='l2row';locRow.style.cssText='width:100%;margin:2px 0 0 0;';
-    const locLabel=document.createElement('span');
-    locLabel.textContent='📍';locLabel.style.cssText='font-size:11px;opacity:.5;flex-shrink:0';
-    locRow.appendChild(locLabel);
+    locRow.className='l2row';
+    locRow.style.cssText=`width:100%;margin:2px 0 0 0;${locExpanded?'':'display:none'}`;
     const sortedLocs=[...locCounts.entries()].sort((a,b)=>b[1]-a[1]);
     sortedLocs.forEach(([loc,cnt])=>{
       const active=S.activeLocation===loc;
@@ -3000,6 +3013,13 @@ function buildFilterBar(){
       locRow.appendChild(chip);
     });
     bar.appendChild(locRow);
+
+    locToggle.addEventListener('click',()=>{
+      const nowHidden=locRow.style.display==='none';
+      locRow.style.display=nowHidden?'':'none';
+      S._locRowExpanded=nowHidden;
+      locToggle.querySelector('span:last-child').textContent=nowHidden?' ▴':' ▾';
+    });
   }
 
   // ⚙ 管理按鈕（靠右）
