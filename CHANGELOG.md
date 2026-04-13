@@ -1,0 +1,125 @@
+# 變更日誌
+
+## 2026-04-12（第五批優化）
+
+### local-ig.html
+- **標籤管理 Modal**：⚙ 按鈕改為開啟全頁 Modal（`#tagMgrModal`），取代舊版 `l1Manager` 浮動面板
+  - 預設分類：顯示所有 TAG_HIERARCHY 項目；可隱藏/顯示、重命名、修改關鍵字；不可刪除
+  - 自定義分類：完整 CRUD（新增、改名/改 kw、刪除）
+  - L2 管理（點 ▼ L2 展開）：預設分類可新增 extra L2；自定義分類可新增/編輯/刪除 L2
+  - 地點自動 L2（`_useLocationAsL2`）顯示只讀提示
+  - Esc / 點背景 / × 按鈕關閉；展開狀態在重渲染間保持
+- **`getEffectiveHierarchy()` 擴展**：支援 `cfg.overrides`（預設 L1 的名稱/kw 覆蓋）與 `cfg.extraL2`（預設 L1 的額外 L2 子項）；自定義分類新增支援 `children`（L2 子分類）
+
+---
+
+## 2026-04-12（第四批優化）
+
+### local-ig.html
+- **九宮格 Caption 條**：相冊九宮格模式每張照片下方加固定高度（40px）文字條，顯示 per-photo caption；無備注時留空灰條維持整齊高度；index 0 照片無獨立備注時 fallback 到相冊整體文案；CSS 重構為 `.gridCellWrap`（flex column）+ `.gridImgWrap`（aspect-ratio:1）+ `.gridCaption`
+
+---
+
+## 2026-04-12（第三批優化）
+
+### local-ig.html
+- **刪除相冊**：批量操作欄新增「🗑 刪除」按鈕；相冊詳情頁也有「🗑 刪除」連結；彈出確認對話框後呼叫 `removeEntry(name, {recursive:true})` 刪除文件夾，同步清除 localStorage 殘留
+- **時間軸視圖**：Header 新增 📅 按鈕，點擊切換時間軸模式；相冊按 YYYY.MM 分組，各月份顯示黏性月份標題；再次點擊恢復格狀視圖
+- **全屏 Lightbox**：LB Header 新增 ⛶ 按鈕，呼叫 `requestFullscreen()`；關閉 LB 或 Esc 自動退出全屏
+- **幻燈片模式**：LB Header 新增 ▶ 按鈕，點擊開始 3.5s 自動翻頁；顯示 ⏸ 表示播放中；Space 鍵切換播放/暫停；最後一張自動停止
+- **手勢滑動擴大**：觸控滑動由 `lbImg` 擴大至整個 `lbImgArea`，垂直滑動不觸發翻頁
+
+### ig_download.py
+- **修復 IG 定位導入失敗**：改為優先從 `post._node['location']['name']` 讀取（GraphQL 緩存，無額外 API 請求），找不到再回退至 `post.location.name`；解決大量帖子地點為空的問題
+
+---
+
+## 2026-04-12（第二批優化）
+
+### local-ig.html
+- **#10 容錯**：`meta.json` 解析失敗時標記 `_corruptMeta`，卡片顯示 ⚠️ 徽章，統計列計數損壞數
+- **#2 日期排序**：排序按鈕改為 4 段循環（名稱↓ / 名稱↑ / 日期↓ / 日期↑），新增 `getAlbumDate()` 輔助函數
+- **#1 全文搜尋**：Home 頂部加搜尋欄，即時過濾相冊名稱 / 文案 / 地點；`/` 鍵或 Ctrl+F 聚焦
+- **#7 統計列**：搜尋欄下方顯示「N 個相冊 · M 張圖 · V 支影片 · ⚠️ K 個損壞」，篩選後即時更新
+- **#3 收藏**：相冊卡片右上角 ☆/★ 按鈕，收藏持久化於 localStorage；FilterBar 加「⭐ 收藏 N」chip
+- **#8 封面替換**：相冊 grid view 每張縮圖 hover 顯示「設為封面」，點擊寫入 `notes.json.coverPhoto`；下次載入自動套用
+- **#6 鍵盤快捷鍵**：`/` / Ctrl+F 搜尋、`r` 刷新、`Esc` 關 modal / 返回、`←→` Lightbox 翻頁
+- **#5 翻譯 Modal**：底部加「↻ 刷新相冊」按鈕，翻譯完直接刷新不需關 modal 再點 header
+- **#4 導入 Modal 整合腳本**：新增「📁 散圖轉換」和「🐱 哼哼猫」tab，各自帶路徑輸入 + --dry-run checkbox；轉換工具隱藏數量欄；路徑預填當前開啟文件夾
+
+### ig_download.py
+- **#9 進度條**：每條帖子顯示進度條（`█░` 字元）、百分比、已下載數；等待延遲顯示倒計時
+
+---
+
+## 2026-04-12
+
+### local-ig.html
+- 修復：↻ 刷新按鈕點擊後無反應（`S.rootDirHandle` 為 null 時靜默返回）→ 改為顯示提示 Toast
+- 改善：↻ 刷新成功後 Toast 顯示相冊數量變化（+N / -N / 共N個），方便確認是否抓到新內容
+- 修復：刷新前清除舊封面 Object URL（避免記憶體洩漏，確保圖片重新載入）
+- 修復：有新相冊且標籤篩選生效時，自動清除篩選以確保新內容可見
+- 新增：導入 Modal 平台切換 Tab（📷 Instagram / 🔴 小紅書），各平台顯示對應輸入欄與腳本命令
+- 新增：數量欄加入「自訂」輸入框，可直接填入任意數字；與 chips 互斥（填數字則清除 chip 選中，點 chip 則清除數字）
+- 改善：小紅書 Cookie 自動 localStorage 持久化（key: `xhs-cookie`）
+- 同步：導入 Modal 內「↻ 刷新相冊」亦加入數量差異 Toast，與 header ↻ 行為一致
+- 新增：Header 🌐 翻譯按鈕（文件夾開啟後顯示），開啟「批量翻譯」Modal
+- Modal：選擇目標語言（EN/繁中/简中/日語/한국어/ภาษาไทย/FR/DE）→ 生成命令並複製
+- 命令自動帶入當前文件夾路徑（`--folder`）與語言（`--lang`），直接在終端執行即可
+
+### APP - deep-translator.py
+- 新增：支援 CLI 參數 `--folder DIR` 和 `--lang LANG`，從外部調用時自動預填 GUI 欄位
+
+---
+
+## 2026-04-11
+
+### local-ig.html
+- 修復：更換「儲存路徑」（igOutput）後，`S.rootAbsPath` 未同步 → 「打開文件夾」、路徑複製等功能仍顯示舊路徑
+- 修復：Quick IG 面板開啟狀態下切換文件夾或更換輸出路徑，面板路徑不自動刷新
+- 實作：`ig-output-changed` / `folder-loaded` 自定義事件，跨模組通知路徑更新
+- 新增：刷新頁面後自動恢復上次文件夾（若已有權限則靜默載入；否則顯示一鍵恢復畫面，不再跳回 Welcome）
+- 新增：`↻` 重新掃描按鈕（Header），可同步後台對文件夾的增刪改（如 Python 腳本下載新帖子後）
+- 重構：`doLoadFolder()` 提取公用載入邏輯，`openFolder` 與 restore 共用
+- 新增：每張相冊卡片右上角加號按鈕（hover 顯示），點擊開啟「導入更多帖子」Modal
+- Modal：預填用戶名（`S.rootName`）、最新 N 筆選擇器（10/20/50/100/全部，預設 20）
+- Modal：自動帶入 ig-output-path 輸出路徑、sessionid（若有），即時生成下載命令
+- Modal：「複製命令」一鍵複製 + 「↻ 刷新相冊」執行腳本後直接同步新帖子
+
+---
+
+## 2026-04-10
+
+### ig_download.py
+- 修復 `--sessionid` 傳入 URL 編碼值時自動 decode（`%3A` → `:`）
+- 新增：設置 sessionid 後自動向 Instagram 行動 API 取得登入用戶名，確保 instaloader 使用已登入 endpoint（修復 `'edges'` 錯誤）
+
+### local-ig.html
+- IG 面板新增 **Session ID** 輸入欄，填入後自動帶入命令（取代失效的 `--cookies-from-browser chrome`）
+- Session ID 自動 localStorage 持久化，下次開啟不需重填
+- 依賴安裝命令移除 `browser-cookie3`（已不需要）
+
+---
+
+## 2026-04-09
+
+### 初始狀態記錄
+
+專案工具集建立，包含以下 6 個文件：
+
+- `local-ig.html` — 瀏覽器本地相冊查看器（核心 UI）
+- `ig_download.py` — Instagram 帖子下載器（支援公開/私密帳號、Cookie 登入、範圍下載、限流自動重試）
+- `xhs_download.py` — 小紅書筆記下載器（支援圖文/視頻、Cookie 文件持久化）
+- `flat_convert.py` — 散圖文件夾轉換器（`YY.MM.DD 標題` 命名規律，支援子目錄遞歸）
+- `hhcat_convert.py` — 哼哼猫下載包轉換器（`{序號}_{文案}` 結構，序號自動補零）
+- `APP - deep-translator.py` — JSON 批量翻譯 GUI（Google Translate，5 並發線程，含緩存）
+
+所有工具共用同一個 `meta.json` 結構，均兼容 `local-ig.html` 讀取。
+
+---
+
+<!-- 在此往上新增新的變更記錄，格式：
+## YYYY-MM-DD
+### 工具名稱
+- 變更內容
+-->

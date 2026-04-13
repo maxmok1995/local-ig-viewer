@@ -1,0 +1,5 @@
+xhs_cookie.txt
+downloads/
+.claude/
+*.pyc
+__pycache__/
