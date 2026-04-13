@@ -1888,7 +1888,7 @@ const S = {
   activeTags:new Set(),
   expandedL1s:new Set(),
   expandedL2s:new Set(),
-  sortMode:'name-desc',  // 'name-desc'|'name-asc'|'date-desc'|'date-asc'
+  sortMode:'date-desc',  // 'date-desc'|'date-asc'
   mediaFilter:'all',     // 'all'|'video'|'photo'
   searchQuery:'',
   showFavOnly:false,
@@ -2486,8 +2486,8 @@ function isVideoAlbum(alb){
   const photos=alb.photos, n=photos.length, vc=photos.filter(p=>p.isVideo).length;
   return vc===n||(alb.postMeta?.is_video&&vc===0&&n===1);
 }
-const SORT_CYCLE=['name-desc','name-asc','date-desc','date-asc'];
-const SORT_LABELS={'name-desc':'名稱 ↓','name-asc':'名稱 ↑','date-desc':'日期 ↓','date-asc':'日期 ↑'};
+const SORT_CYCLE=['date-desc','date-asc'];
+const SORT_LABELS={'date-desc':'日期 ↓','date-asc':'日期 ↑'};
 function updateSortBtn(){ btnSort.textContent=SORT_LABELS[S.sortMode]||'排序'; }
 function updateMediaBtn(){
   btnMediaFilter.textContent={all:'全部',video:'仅视频',photo:'仅照片'}[S.mediaFilter];
