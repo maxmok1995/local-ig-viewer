@@ -5350,12 +5350,19 @@ document.addEventListener('keydown',e=>{
     return;
   }
 
-  // ← →：Lightbox 前後（LB 已有自己的處理，這裡補 home/album 快速翻頁）
+  // ← →：Lightbox 前後 / 相冊視圖切換相鄰相冊
   if(S.view==='lb'){
     if(e.key==='ArrowLeft') lbPrev.click();
     else if(e.key==='ArrowRight') lbNext.click();
     // Space：幻燈片 播放/暫停
     if(e.key===' '){e.preventDefault();$('lbSlideshow').click();}
+  }
+  if(S.view==='album'&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){
+    const list=getFilteredAlbums();
+    const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
+    if(idx===-1) return;
+    const next=list[idx+(e.key==='ArrowLeft'?-1:1)];
+    if(next) goAlbum(next);
   }
 });
 
