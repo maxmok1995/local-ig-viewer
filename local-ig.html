@@ -1143,14 +1143,15 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
   <div id="mapLegend">點擊圖釘查看相冊</div>
 </div>
 
-<!-- Album feed -->
-<div class="view" id="vAlbum">
-  <div id="albumNav" style="display:none">
-    <button id="albumNavPrev" class="hbtn ghost">‹</button>
-    <span id="albumNavIdx"></span>
-    <button id="albumNavNext" class="hbtn ghost">›</button>
-  </div>
+<!-- Album nav bar（在 vAlbum 外，避免被 innerHTML='' 清掉）-->
+<div id="albumNav" style="display:none">
+  <button id="albumNavPrev" class="hbtn ghost">‹</button>
+  <span id="albumNavIdx"></span>
+  <button id="albumNavNext" class="hbtn ghost">›</button>
 </div>
+
+<!-- Album feed -->
+<div class="view" id="vAlbum"></div>
 
 <!-- Lightbox -->
 <div class="view" id="vLB">
@@ -2630,6 +2631,7 @@ function goHome(){
   backfillLocationL2();
   renderHome();showView('home');
   hdrTitle.textContent=`📸 ${S.rootName||t('appName')}`;
+  $('albumNav').style.display='none';
   btnBack.style.display='none';btnViewToggle.style.display='none';
   btnSort.style.display='';updateSortBtn();
   $('btnTimeline').style.display='';
