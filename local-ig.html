@@ -147,18 +147,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .albumCard .aMeta{font-size:10px;color:rgba(255,255,255,.6);margin-top:2px;
   display:flex;gap:6px;align-items:center}
 .albumCard .cardDate{font-size:10px;color:rgba(255,255,255,.45);margin-bottom:1px;letter-spacing:.02em}
+.albumCard .cardPos{font-size:10px;color:rgba(255,255,255,.35);margin-bottom:1px;text-align:right;letter-spacing:.02em}
 .albumCard .cardLoc{font-size:10px;color:rgba(255,255,255,.7);margin-bottom:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px}
 
 /* ── Album feed ───────────────────────────────────────────── */
 #vAlbum{max-width:700px;margin:0 auto;padding-bottom:60px}
-#albumNav{
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  padding:6px 12px;background:rgba(10,10,10,.6);
-  border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);
-}
-#albumNav button{font-size:18px;line-height:1;padding:2px 8px}
-#albumNavIdx{min-width:60px;text-align:center}
 .albumMeta{padding:18px 16px;border-bottom:1px solid var(--border);margin-bottom:3px}
 .albumMetaTitle{
   font-size:20px;font-weight:700;background:none;border:none;
@@ -1141,13 +1135,6 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
 <div class="view" id="vMap">
   <div id="mapView"></div>
   <div id="mapLegend">點擊圖釘查看相冊</div>
-</div>
-
-<!-- Album nav bar（在 vAlbum 外，避免被 innerHTML='' 清掉）-->
-<div id="albumNav" style="display:none">
-  <button id="albumNavPrev" class="hbtn ghost">‹</button>
-  <span id="albumNavIdx"></span>
-  <button id="albumNavNext" class="hbtn ghost">›</button>
 </div>
 
 <!-- Album feed -->
@@ -2631,7 +2618,6 @@ function goHome(){
   backfillLocationL2();
   renderHome();showView('home');
   hdrTitle.textContent=`📸 ${S.rootName||t('appName')}`;
-  $('albumNav').style.display='none';
   btnBack.style.display='none';btnViewToggle.style.display='none';
   btnSort.style.display='';updateSortBtn();
   $('btnTimeline').style.display='';
@@ -2660,18 +2646,6 @@ function goAlbum(alb){
   $('btnAddPosts').style.display='';
   btnOpen.style.display='none';updateGridBtn();
   $('hdr').style.display='';
-  updateAlbumNav();
-}
-
-function updateAlbumNav(){
-  const nav=$('albumNav');if(!nav) return;
-  const list=getFilteredAlbums();
-  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
-  if(idx===-1||list.length<=1){nav.style.display='none';return;}
-  nav.style.display='';
-  $('albumNavIdx').textContent=`${idx+1} / ${list.length}`;
-  $('albumNavPrev').disabled=idx===0;
-  $('albumNavNext').disabled=idx===list.length-1;
 }
 
 function updateGridBtn(){
@@ -3475,7 +3449,7 @@ function mediaLabel(photos, postMeta){
   return t('photoCount')(n);
 }
 
-function buildCard(alb){
+function buildCard(alb,idx,total){
   const card=document.createElement('div');card.className='albumCard';
   if(alb.coverUrl){
     const coverSrc=alb.firstImage||(alb.photos.find(p=>!p.isVideo))||alb.photos[0];
@@ -3542,6 +3516,13 @@ function buildCard(alb){
   });
   card.appendChild(favBtn);
   const ov=document.createElement('div');ov.className='overlay';
+  // 位置標記 N/M
+  if(idx!=null&&total!=null&&total>1){
+    const posEl=document.createElement('div');
+    posEl.className='cardPos';
+    posEl.textContent=`${idx} / ${total}`;
+    ov.appendChild(posEl);
+  }
   // 日期：优先 meta.json 发布时间，回退到第一张媒体文件的 date
   const _d=alb.postMeta?.date?new Date(alb.postMeta.date):alb.photos[0]?.date;
   if(_d&&!isNaN(+_d)){
@@ -3601,7 +3582,8 @@ function renderHomeGrid(container){
     container.innerHTML=`<div class="empty">${t('noTagResult')}</div>`;return;
   }
   const grid=document.createElement('div');grid.className='homeGrid';
-  filtered.forEach(alb=>grid.appendChild(buildCard(alb)));
+  const total=filtered.length;
+  filtered.forEach((alb,i)=>grid.appendChild(buildCard(alb,i+1,total)));
   container.appendChild(grid);
 }
 
@@ -3688,13 +3670,15 @@ function renderTimeline(container){
     if(b==='未知日期') return -1;
     return b.localeCompare(a);
   });
+  const total=filtered.length;
+  let globalIdx=0;
   sortedKeys.forEach(key=>{
     const group=document.createElement('div');group.className='timelineGroup';
     const hdr=document.createElement('div');hdr.className='timelineMonthHdr';
     hdr.innerHTML=`<span>${key}（${groups.get(key).length} 個）</span>`;
     group.appendChild(hdr);
     const grid=document.createElement('div');grid.className='homeGrid';
-    groups.get(key).forEach(alb=>grid.appendChild(buildCard(alb)));
+    groups.get(key).forEach(alb=>grid.appendChild(buildCard(alb,++globalIdx,total)));
     group.appendChild(grid);
     container.appendChild(group);
   });
@@ -4855,16 +4839,7 @@ $('btnMap').addEventListener('click',()=>{
 
 $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
 
-$('albumNavPrev').addEventListener('click',()=>{
-  const list=getFilteredAlbums();
-  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
-  if(idx>0) goAlbum(list[idx-1]);
-});
-$('albumNavNext').addEventListener('click',()=>{
-  const list=getFilteredAlbums();
-  const idx=list.findIndex(a=>a.name===S.currentAlbum?.name);
-  if(idx<list.length-1) goAlbum(list[idx+1]);
-});
+
 
 // ── 翻譯 Modal ────────────────────────────────────────────────────────────
 (function(){
