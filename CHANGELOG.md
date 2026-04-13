@@ -1,5 +1,14 @@
 # 變更日誌
 
+## 2026-04-13
+
+### 項目發佈
+- **GitHub 私有倉庫**：https://github.com/maxmok1995/local-ig-viewer
+  - 包含：`local-ig.html`、`ig_download.py`、`xhs_download.py`、`flat_convert.py`、`hhcat_convert.py`、`APP - deep-translator.py`、`CHANGELOG.md`、`PROJECT_MANUAL.md`
+  - 排除：`xhs_cookie.txt`（敏感 Cookie）、`downloads/`、`.claude/`
+
+---
+
 ## 2026-04-12（第五批優化）
 
 ### local-ig.html
