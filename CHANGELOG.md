@@ -1,5 +1,36 @@
 # 變更日誌
 
+版本規則：
+- `VERSION` 使用 `MAJOR.MINOR.PATCH`（SemVer 風格）
+- `CHANGELOG.md` 每次發布至少新增一個 `## vX.Y.Z - YYYY-MM-DD` 條目
+- `PATCH`：Bug 修復、無破壞性微調
+- `MINOR`：新增功能、向下兼容
+- `MAJOR`：不兼容變更
+
+## v0.4.0 - 2026-04-27
+
+### local-ig.html
+- 修復：「打開資料夾 / 打开文件夹」在 `_path.txt` 已保存真實存儲路徑時，仍可能被 `HTML` 源碼所在目錄覆蓋，導致複製出錯誤的源碼路徑
+- 調整：`readFolder()` 現在在 `_path.txt` 的最後一段與當前根目錄名稱一致時，直接信任已保存的真實路徑，不再重寫為 HTML 同級目錄
+
+### 項目規範
+- 新增：根目錄 `VERSION` 文件
+- 新增：版本約定（`VERSION` + `CHANGELOG`）
+- 新增：`tests/test_root_path_behavior.py`
+- 新增：`tests/test_versioning_convention.py`
+
+## 2026-04-20
+
+### local-ig.html
+- **BUG3 修復（備注丟失）**：`writeNotes()` 原本只從 localStorage 讀取 per-photo captions，在 localStorage 為空時會覆蓋 notes.json 並清除所有備注；改為將 `alb.notesData.photos`（從 notes.json 讀入的記憶體副本）與 localStorage 合併，localStorage 編輯優先，notesData 填補缺口
+- **自動恢復**：新增 `recoverNotesFromMemory()`，在每次載入文件夾後自動執行；將記憶體中的 notesData.photos 同步回 localStorage 並觸發 `scheduleWrite`；首次恢復時顯示 Toast 提示恢復數量
+- **BUG4 修復（LB 備注編輯）**：Lightbox 底部新增可編輯備注欄（✏️ 圖示 + textarea）；優先讀取 `alb.notesData?.photos`，其次 localStorage，index 0 fallback 到相冊整體文案
+- **BUG5 修復（標簽篩選不全）**：`buildFilterBar()` 中 `classifiedSuffixes` 改為 per-album（原本 global 導致跨相冊誤排除相同字串的 bare tag）
+- **BUG6 修復（路徑漂移）**：`readFolder()` 改用 `getHtmlDir()` 驗證並更正 `S.rootAbsPath`，解決文件夾移動後「添加帖子」和「打開文件夾」仍使用舊路徑的問題
+- **功能：九宮格備注快速編輯**：每格 caption 條 hover 顯示 ✏ 按鈕；點擊 ✏ 或直接點文字區進入編輯模式（textarea）；`Blur` / `Esc` 儲存；即時同步 `notesData` + localStorage + `scheduleWrite`；編輯時不觸發 Lightbox
+
+---
+
 ## 2026-04-13（功能擴展：相冊導航 + 搜尋高亮 + 地點篩選 + 地圖視圖）
 
 ### local-ig.html

@@ -20,6 +20,40 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:8px;padding:0 14px;z-index:90;
 }
+#hdr.homeModesOn{
+  height:48px;padding:0 14px;
+  flex-direction:row;align-items:center;gap:8px;
+}
+#hdrMainRow{display:flex;align-items:center;gap:8px;min-height:48px;flex:1;min-width:0;flex-wrap:nowrap}
+#hdr.homeModesOn #hdrMainRow{min-height:48px}
+#hdrHomeModes{
+  display:none;align-items:center;flex-wrap:nowrap;
+  width:max-content;max-width:100%;overflow:hidden;
+  border:1px solid var(--border);border-radius:999px;
+  background:var(--s1);padding:3px;gap:0;flex-shrink:0;
+}
+#hdr.homeModesOn #hdrHomeModes{display:flex}
+#hdr.homeModesOn #hdrTitle{flex:0 1 auto;max-width:220px}
+#hdr.homeModesOn #langSel,#hdr.homeModesOn #btnOpen{align-self:auto}
+.hdrHomeModeBtn{
+  background:transparent;border:none;color:var(--muted);
+  padding:7px 14px;border-radius:999px;font-size:12px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.hdrHomeModeBtn:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.hdrHomeModeBtn.active{background:var(--accent);color:#fff}
+.hdrHomeModeExtraBtn{
+  background:transparent;border:none;border-left:1px solid var(--border);color:var(--muted);
+  padding:7px 14px;border-radius:999px;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.hdrHomeModeExtraBtn:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.hdrHomeModeExtraBtn.active{background:rgba(0,149,246,.14);color:#d9efff}
+.hdrHomeModeExtraBtn[hidden]{display:none!important}
+@media(max-width:760px){
+  #hdr.homeModesOn{height:48px;padding:0 10px;gap:6px}
+  #hdrHomeModes{max-width:min(58vw,360px)}
+  #hdrMainRow{gap:6px}
+}
 #hdrTitle{font-size:15px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hbtn{
   background:none;border:1px solid var(--border);color:var(--text);
@@ -59,6 +93,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 }
 .wBtnGhost:hover{background:#252525}
 .wNote{font-size:11px;color:var(--muted);max-width:300px;text-align:center;line-height:1.6}
+.compatPanel{
+  width:100%;max-width:360px;text-align:left;
+  border:1px solid var(--border);border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+  padding:12px 14px;
+}
+.compatPanel.ok{border-color:rgba(62,180,137,.45);background:rgba(62,180,137,.08)}
+.compatPanel.warn{border-color:rgba(255,191,71,.4);background:rgba(255,191,71,.08)}
+.compatPanel.err{border-color:rgba(255,92,92,.45);background:rgba(255,92,92,.08)}
+#compatTitle{font-size:12px;font-weight:700;margin-bottom:4px}
+#compatBody{font-size:11px;color:var(--muted);line-height:1.6}
 
 /* ── IG Import Panel ─────────────────────────────────────── */
 #igPanel{
@@ -232,11 +277,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   flex-shrink:0;padding:10px 18px 16px;background:#000;
   border-top:1px solid var(--border);min-height:54px;
 }
+.lbCaptionWrap{display:flex;align-items:flex-start;gap:6px;margin-top:4px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.015)}
+.lbCaptionIcon{font-size:13px;color:#555;padding-top:3px;flex-shrink:0;cursor:text;user-select:none}
 .lbCaption{
-  font-size:14px;color:var(--text);background:none;border:none;
+  flex:1;font-size:14px;color:var(--text);background:none;border:none;
+  border-bottom:1px solid transparent;
   outline:none;width:100%;resize:none;font-family:inherit;line-height:1.7;
+  transition:border-color .15s,background .15s;min-height:44px;
 }
-.lbCaption::placeholder{color:#333}
+.lbCaption:focus{border-bottom-color:var(--border);}
+.lbCaption.empty{background:rgba(255,255,255,.02)}
+.lbCaption::placeholder{color:#777}
 
 /* ── Per-photo action buttons ────────────────────────────── */
 .postActions{
@@ -294,9 +345,11 @@ input[type=file]{display:none}
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
 }
+.filterSection{border-bottom:1px solid var(--border)}
+.filterSection.collapsed .filterBar{display:none}
 .filterBar{
   display:flex;flex-wrap:wrap;gap:6px;
-  padding:9px 10px;border-bottom:1px solid var(--border);
+  padding:9px 10px;
 }
 .filterChip{
   white-space:nowrap;padding:5px 12px;border-radius:18px;
@@ -685,6 +738,7 @@ input[type=file]{display:none}
   opacity:0;transition:opacity .15s;z-index:2;line-height:1;
 }
 .gridCellWrap:hover .gridMoveBtn{opacity:1}
+.gridCaptionWrap{position:relative;}
 .gridCaption{
   height:40px;padding:5px 7px;
   font-size:11px;line-height:1.45;
@@ -696,6 +750,21 @@ input[type=file]{display:none}
   word-break:break-all;
 }
 .gridCaption.empty{opacity:.2}
+.gridCaptionEditBtn{
+  position:absolute;top:4px;right:4px;
+  background:rgba(0,0,0,.5);border:none;color:rgba(255,255,255,.6);
+  font-size:10px;cursor:pointer;padding:1px 3px;border-radius:3px;line-height:1.2;
+  opacity:0;transition:opacity .15s;z-index:2;
+}
+.gridCellWrap:hover .gridCaptionEditBtn{opacity:1}
+.gridCaptionTA{
+  display:none;
+  width:100%;min-height:40px;padding:5px 7px;
+  font-size:11px;line-height:1.45;
+  color:rgba(255,255,255,.85);background:var(--s2);
+  border:none;border-top:1px solid var(--accent);
+  outline:none;resize:none;font-family:inherit;box-sizing:border-box;
+}
 
 /* ── Restore view ────────────────────────────────────────── */
 #vRestore.on{display:flex;flex-direction:column;align-items:center;
@@ -737,6 +806,47 @@ input[type=file]{display:none}
   display:none;
 }
 #homeSearchClear:hover{color:var(--text)}
+#filterCollapseBtn{
+  background:var(--s2);border:1px solid var(--border);color:var(--muted);
+  width:32px;height:32px;border-radius:10px;cursor:pointer;font-size:14px;
+  line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+#filterCollapseBtn:hover{border-color:#666;color:var(--text)}
+#filterCollapseBtn.autoHint{
+  border-color:var(--accent);color:#d9efff;background:rgba(0,149,246,.16);
+  box-shadow:0 0 0 1px rgba(0,149,246,.18), 0 0 14px rgba(0,149,246,.18);
+}
+#filterLockBtn{
+  background:var(--s2);border:1px solid var(--border);color:var(--muted);
+  width:32px;height:32px;border-radius:10px;cursor:pointer;font-size:13px;
+  line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+#filterLockBtn:hover{border-color:#666;color:var(--text)}
+#filterLockBtn.active{border-color:var(--accent);color:#d9efff;background:rgba(0,149,246,.16)}
+.homePreviewBar{
+  display:flex;gap:8px;padding:0 14px 8px;flex-wrap:wrap;
+}
+.homePreviewBtn{
+  background:var(--s2);border:1px solid var(--border);color:var(--text);
+  padding:7px 12px;border-radius:999px;font-size:12px;cursor:pointer;
+  transition:all .15s;
+}
+.homePreviewBtn:hover{border-color:#555}
+.homePreviewBtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.homePreviewExtraBtn{
+  background:transparent;border:1px dashed #4a4a4a;color:var(--muted);
+  padding:7px 12px;border-radius:999px;font-size:12px;cursor:pointer;
+  transition:all .15s;
+}
+.homePreviewExtraBtn:hover{border-color:#666;color:var(--text)}
+.homePreviewExtraBtn.active{background:rgba(0,149,246,.14);border-color:var(--accent);color:#d9efff}
+.homePhotoGroup{padding-top:8px}
+.homePhotoGroupTitle{
+  position:sticky;top:118px;z-index:5;background:rgba(0,0,0,.88);
+  padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+}
+.homePhotoMeta{font-size:10px;color:rgba(255,255,255,.72);margin-top:2px}
 .statsRow{
   font-size:11px;color:var(--muted);
   padding:6px 14px 0;
@@ -859,8 +969,10 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
   flex:1;padding:10px;border-radius:10px;
   font-size:13px;font-weight:500;cursor:pointer;border:none;
 }
-#transCopyBtn{background:var(--accent);color:#fff}
-#transCopyBtn:hover{opacity:.85}
+#transCopyCmdBtn{background:var(--accent);color:#fff}
+#transCopyCmdBtn:hover{opacity:.85}
+#transCopyPsBtn{background:#1f1f1f;color:#fff;border:1px solid var(--border)!important}
+#transCopyPsBtn:hover{background:#2a2a2a}
 #transRefreshBtn{background:var(--s2);color:var(--text);border:1px solid var(--border)!important}
 #transRefreshBtn:hover{background:#252525}
 #transCloseBtn2{background:transparent;color:var(--muted);border:1px solid var(--border)!important;flex:0 0 auto;padding:10px 14px}
@@ -953,20 +1065,23 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
 
 <!-- Header -->
 <div id="hdr">
-  <button class="hbtn ghost" id="btnBack" style="display:none">‹</button>
-  <div id="hdrTitle">📸 本地相册</div>
-  <button class="hbtn" id="btnViewToggle" style="display:none">九宫格</button>
-  <button class="hbtn" id="btnSort" style="display:none">↓ 倒序</button>
-  <button class="hbtn" id="btnTimeline" style="display:none" title="時間軸視圖">📅</button>
-  <button class="hbtn" id="btnMap" style="display:none" title="地圖視圖">🗺</button>
-  <button class="hbtn" id="btnMediaFilter" style="display:none">全部</button>
-  <button class="hbtn" id="btnQuickIG" style="display:none" title="快捷更新 IG">📥</button>
-  <button class="hbtn" id="btnRefresh" style="display:none" title="重新掃描，同步文件夾內容">↻</button>
-  <button class="hbtn" id="btnTranslate" style="display:none" title="批量翻譯帖子文案">🌐</button>
-  <button class="hbtn" id="btnBackup" style="display:none" title="備份/還原標籤、筆記、收藏">💾</button>
-  <button class="hbtn" id="btnAddPosts" style="display:none" title="導入更多帖子">＋</button>
-  <select id="langSel" title="Language"></select>
-  <button class="hbtn pri" id="btnOpen">选择文件夹</button>
+  <div id="hdrMainRow">
+    <button class="hbtn ghost" id="btnBack" style="display:none">‹</button>
+    <div id="hdrTitle">📸 本地相册</div>
+    <div id="hdrHomeModes"></div>
+    <button class="hbtn" id="btnViewToggle" style="display:none">九宫格</button>
+    <button class="hbtn" id="btnSort" style="display:none">↓ 倒序</button>
+    <button class="hbtn" id="btnTimeline" style="display:none" title="時間軸視圖">📅</button>
+    <button class="hbtn" id="btnMap" style="display:none" title="地圖視圖">🗺</button>
+    <button class="hbtn" id="btnMediaFilter" style="display:none">全部</button>
+    <button class="hbtn" id="btnQuickIG" style="display:none" title="快捷更新 IG">📥</button>
+    <button class="hbtn" id="btnRefresh" style="display:none" title="重新掃描，同步文件夾內容">↻</button>
+    <button class="hbtn" id="btnTranslate" style="display:none" title="批量翻譯帖子文案">🌐</button>
+    <button class="hbtn" id="btnBackup" style="display:none" title="備份/還原標籤、筆記、收藏">💾</button>
+    <button class="hbtn" id="btnAddPosts" style="display:none" title="導入更多帖子">＋</button>
+    <select id="langSel" title="Language"></select>
+    <button class="hbtn pri" id="btnOpen">选择文件夹</button>
+  </div>
 </div>
 
 <!-- Welcome -->
@@ -1116,6 +1231,10 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
     </div>
   </div>
 
+  <div id="compatPanel" class="compatPanel warn">
+    <div id="compatTitle">浏览器兼容性检查</div>
+    <div id="compatBody">正在检测当前打开方式与文件夹访问能力…</div>
+  </div>
   <div class="wNote" id="compatNote">需要 Chrome 或 Edge 浏览器 · 所有数据仅在本地存储</div>
 </div>
 
@@ -1160,7 +1279,10 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
     <button class="lbNav r" id="lbNext">›</button>
   </div>
   <div class="lbFoot">
-    <textarea class="lbCaption" id="lbCaption" rows="2" placeholder="写下这张照片的故事…"></textarea>
+    <div class="lbCaptionWrap">
+      <span class="lbCaptionIcon" id="lbCaptionIcon">✏️</span>
+      <textarea class="lbCaption" id="lbCaption" rows="1" placeholder="写下这张照片的故事…"></textarea>
+    </div>
   </div>
 </div>
 
@@ -1313,7 +1435,8 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       </div>
     </div>
     <div id="transFoot">
-      <button id="transCopyBtn">複製命令</button>
+      <button id="transCopyCmdBtn">複製 CMD</button>
+      <button id="transCopyPsBtn">複製 PowerShell</button>
       <button id="transRefreshBtn">↻ 刷新相冊</button>
       <button id="transCloseBtn2">取消</button>
     </div>
@@ -1546,7 +1669,7 @@ function getEffectiveHierarchy(){
   const overrides=cfg.overrides||{};
   const extraL2=cfg.extraL2||{};
 
-  const base=TAG_HIERARCHY
+  const base=[...TAG_HIERARCHY, ...buildFolderDefaultCategoryGroups()]
     .filter(g=>!hiddenSet.has(tagName(g.l1)))
     .map(g=>{
       const origKey=tagName(g.l1);
@@ -1576,7 +1699,9 @@ function getEffectiveHierarchy(){
       :{l2:ch.l2,kw:ch.kw||[]}),
     _custom:true,
   }));
-  return [...base,...custom];
+  const baseNames=new Set(base.map(g=>tagName(g.l1)));
+  const filteredCustom=custom.filter(c=>!baseNames.has(tagName(c.l1)));
+  return [...base,...filteredCustom];
 }
 
 // ── i18n ──────────────────────────────────────────────────────────────────
@@ -1601,12 +1726,12 @@ const LANGS = {
     noPhotos:'沒有找到照片', loading:'讀取照片中，請稍候…',
     fromIGBadge:'· 來自 Instagram', videoTag:'▶ 影片',
     photoCount:n=>`${n} 張照片`,
-    gridView:'九宮格', feedView:'Feed',
+    gridView:'九宮格', feedView:'Feed', previewAlbums:'相冊封面', previewPhotos:'全部照片', previewShowVideoCovers:'顯示影片封面原圖', previewPhotoIndex:(i,n)=>`第 ${i} / ${n} 張`,
     toastCopied:'指令已複製', toastChrome:'請使用 Chrome 或 Edge',
     toastNoFolder:'未選擇資料夾', toastReadFail:'讀取失敗：',
     viewFile:'🔗 查看', copyPath:'📋 複製路徑', openDir:'📂 打開資料夾',
     pathCopied:'✓ 路徑已複製', pathUnknown:'⚠️ 尚未設定儲存路徑',
-    folderCopied:'📂 路徑已複製 → 貼到資源管理員地址列',
+    folderCopied:'📂 路徑已複製 → 貼到資源管理員地址列', explorerOpenOk:'📂 已打開資料夾', explorerOpenFail:'⚠️ 無法直接打開，已複製路徑',
     reopenFolder:name=>`📂 重新開啟：${name}`,
     locationPh:'添加地點…', filterAll:'全部', filterUntagged:'⬜ 未分類', tagPh:'新增標籤…', tagSuggest:'建議', noTagResult:'無符合相簿',
     movePhoto:'↗ 移動', moveModalTitle:'移動到…', moveSearch:'搜尋相簿…', moveDone:'✓ 已移動', cancel:'取消',
@@ -1631,12 +1756,12 @@ const LANGS = {
     noPhotos:'没有找到照片', loading:'读取照片中，请稍候…',
     fromIGBadge:'· 来自 Instagram', videoTag:'▶ 影片',
     photoCount:n=>`${n} 张照片`,
-    gridView:'九宫格', feedView:'Feed',
+    gridView:'九宫格', feedView:'Feed', previewAlbums:'相册封面', previewPhotos:'全部照片', previewShowVideoCovers:'显示视频封面原图', previewPhotoIndex:(i,n)=>`第 ${i} / ${n} 张`,
     toastCopied:'命令已复制', toastChrome:'请使用 Chrome 或 Edge',
     toastNoFolder:'未选择文件夹', toastReadFail:'读取失败：',
     viewFile:'🔗 查看', copyPath:'📋 复制路径', openDir:'📂 打开文件夹',
     pathCopied:'✓ 路径已复制', pathUnknown:'⚠️ 尚未设置保存路径',
-    folderCopied:'📂 路径已复制 → 粘贴到资源管理器地址栏',
+    folderCopied:'📂 路径已复制 → 粘贴到资源管理器地址栏', explorerOpenOk:'📂 已打开文件夹', explorerOpenFail:'⚠️ 无法直接打开，已复制路径',
     reopenFolder:name=>`📂 重新打开：${name}`,
     locationPh:'添加地点…', filterAll:'全部', filterUntagged:'⬜ 未分类', tagPh:'新增标签…', tagSuggest:'建议', noTagResult:'无符合相册',
     movePhoto:'↗ 移动', moveModalTitle:'移动到…', moveSearch:'搜索相册…', moveDone:'✓ 已移动', cancel:'取消',
@@ -1661,12 +1786,12 @@ const LANGS = {
     noPhotos:'No photos found', loading:'Loading photos, please wait…',
     fromIGBadge:'· from Instagram', videoTag:'▶ Video',
     photoCount:n=>`${n} photo${n===1?'':'s'}`,
-    gridView:'Grid', feedView:'Feed',
+    gridView:'Grid', feedView:'Feed', previewAlbums:'Album Covers', previewPhotos:'All Photos', previewShowVideoCovers:'Show video cover originals', previewPhotoIndex:(i,n)=>`Photo ${i} / ${n}`,
     toastCopied:'Command copied', toastChrome:'Please use Chrome or Edge',
     toastNoFolder:'No folder selected', toastReadFail:'Read failed: ',
     viewFile:'🔗 View', copyPath:'📋 Copy Path', openDir:'📂 Open Folder',
     pathCopied:'✓ Path copied', pathUnknown:'⚠️ Output path not set',
-    folderCopied:'📂 Path copied → paste in File Explorer address bar',
+    folderCopied:'📂 Path copied → paste in File Explorer address bar', explorerOpenOk:'📂 Folder opened', explorerOpenFail:'⚠️ Could not open directly, path copied',
     reopenFolder:name=>`📂 Reopen: ${name}`,
     locationPh:'Add location…', filterAll:'All', filterUntagged:'⬜ Untagged', tagPh:'Add tag…', tagSuggest:'Suggestions', noTagResult:'No matching albums',
     movePhoto:'↗ Move', moveModalTitle:'Move to…', moveSearch:'Search albums…', moveDone:'✓ Moved', cancel:'Cancel',
@@ -1691,7 +1816,7 @@ const LANGS = {
     noPhotos:'ไม่พบรูปภาพ', loading:'กำลังโหลดรูปภาพ…',
     fromIGBadge:'· จาก Instagram', videoTag:'▶ วิดีโอ',
     photoCount:n=>`${n} รูป`,
-    gridView:'กริด', feedView:'ฟีด',
+    gridView:'กริด', feedView:'ฟีด', previewAlbums:'ปกอัลบั้ม', previewPhotos:'รูปทั้งหมด', previewShowVideoCovers:'แสดงภาพปกวิดีโอแยก', previewPhotoIndex:(i,n)=>`รูปที่ ${i} / ${n}`,
     toastCopied:'คัดลอกคำสั่งแล้ว', toastChrome:'กรุณาใช้ Chrome หรือ Edge',
     toastNoFolder:'ยังไม่ได้เลือกโฟลเดอร์', toastReadFail:'โหลดล้มเหลว: ',
     viewFile:'🔗 ดู', copyPath:'📋 คัดลอกเส้นทาง', openDir:'📂 เปิดโฟลเดอร์',
@@ -1721,7 +1846,7 @@ const LANGS = {
     noPhotos:'写真が見つかりません', loading:'写真を読み込み中…',
     fromIGBadge:'· Instagramより', videoTag:'▶ 動画',
     photoCount:n=>`${n}枚`,
-    gridView:'グリッド', feedView:'フィード',
+    gridView:'グリッド', feedView:'フィード', previewAlbums:'アルバム表紙', previewPhotos:'すべての写真', previewPhotoIndex:(i,n)=>`${i} / ${n} 枚目`,
     toastCopied:'コマンドをコピーしました', toastChrome:'ChromeまたはEdgeをご使用ください',
     toastNoFolder:'フォルダが選択されていません', toastReadFail:'読込失敗：',
     viewFile:'🔗 表示', copyPath:'📋 パスをコピー', openDir:'📂 フォルダを開く',
@@ -1751,7 +1876,7 @@ const LANGS = {
     noPhotos:'사진을 찾을 수 없습니다', loading:'사진을 불러오는 중…',
     fromIGBadge:'· Instagram에서', videoTag:'▶ 동영상',
     photoCount:n=>`${n}장`,
-    gridView:'그리드', feedView:'피드',
+    gridView:'그리드', feedView:'피드', previewAlbums:'앨범 표지', previewPhotos:'전체 사진', previewPhotoIndex:(i,n)=>`${i} / ${n}번째 사진`,
     toastCopied:'명령어가 복사되었습니다', toastChrome:'Chrome 또는 Edge를 사용해 주세요',
     toastNoFolder:'폴더가 선택되지 않았습니다', toastReadFail:'읽기 실패: ',
     viewFile:'🔗 보기', copyPath:'📋 경로 복사', openDir:'📂 폴더 열기',
@@ -1765,6 +1890,54 @@ const LANGS = {
 
 let currentLang = localStorage.getItem('lang-pref') || 'zh-TW';
 const t = key => LANGS[currentLang][key];
+
+function getCompatibilityStatus(){
+  const fileProtocol=location.protocol==='file:' || window.location.href.startsWith('file://');
+  const hasPicker=!!window.showDirectoryPicker;
+  const secure=!!window.isSecureContext;
+  const ua=navigator.userAgent||'';
+  const isRecommended=/Edg\//.test(ua)||/Chrome\//.test(ua);
+  if(fileProtocol) return {level:'err',reason:'file'};
+  if(!hasPicker) return {level:'err',reason:'picker'};
+  if(!secure) return {level:'warn',reason:'secure'};
+  if(!isRecommended) return {level:'warn',reason:'browser'};
+  return {level:'ok',reason:'ok'};
+}
+
+function renderCompatibilityStatus(){
+  const panel=$('compatPanel'), title=$('compatTitle'), body=$('compatBody');
+  if(!panel||!title||!body) return;
+  const s=getCompatibilityStatus();
+  const lang=currentLang;
+  const copy={
+    'zh-CN':{
+      ok:['✅ 环境正常','当前是受支持的打开方式，可以直接选择文件夹并读写本地相册。'],
+      file:['⚠️ 当前是直接双击打开','请改用启动脚本或 localhost 打开；file:// 模式下浏览器会禁止文件夹选择器。'],
+      picker:['⚠️ 当前浏览器不支持文件夹选择器','请使用新版 Chrome 或 Edge 打开本页。'],
+      secure:['⚠️ 当前不是安全上下文','建议通过 http://127.0.0.1:8765/local-ig.html 访问，避免权限问题。'],
+      browser:['⚠️ 浏览器可能受限','建议改用 Chrome 或 Edge，以确保文件夹访问与剪贴板功能正常。'],
+    },
+    'zh-TW':{
+      ok:['✅ 環境正常','目前是受支援的開啟方式，可直接選擇資料夾並讀寫本地相冊。'],
+      file:['⚠️ 目前是直接雙擊開啟','請改用啟動腳本或 localhost；file:// 模式下瀏覽器會阻止資料夾選擇器。'],
+      picker:['⚠️ 目前瀏覽器不支援資料夾選擇器','請使用新版 Chrome 或 Edge 開啟本頁。'],
+      secure:['⚠️ 目前不是安全上下文','建議透過 http://127.0.0.1:8765/local-ig.html 開啟，以避免權限問題。'],
+      browser:['⚠️ 瀏覽器可能受限','建議改用 Chrome 或 Edge，以確保資料夾存取與剪貼簿功能正常。'],
+    },
+    'en':{
+      ok:['✅ Environment ready','This page is running in a supported context and can access the folder picker normally.'],
+      file:['⚠️ Opened directly from disk','Please use the launcher or localhost; browsers block the folder picker on file:// pages.'],
+      picker:['⚠️ Folder picker not supported','Open this page in a recent Chrome or Edge build.'],
+      secure:['⚠️ Not a secure context','Use http://127.0.0.1:8765/local-ig.html to avoid permission issues.'],
+      browser:['⚠️ Browser may be limited','Chrome or Edge is recommended for local folder access and clipboard features.'],
+    }
+  };
+  const group=copy[lang]||copy['en'];
+  const pair=group[s.reason]||group.ok;
+  panel.className='compatPanel '+s.level;
+  title.textContent=pair[0];
+  body.textContent=pair[1];
+}
 
 // 更新 Step3 提示（含儲存路徑 + 用戶名，可選傳入 overrideUser）
 function updateIgStep3Note(overrideUser){
@@ -1807,12 +1980,15 @@ function applyLang(){
   if(L.cancel) $('moveCancelBtn').textContent=L.cancel;
   // Header open button
   $('btnOpen').textContent = L.openFolder.replace(/^📂 /,'');
+  const hp=$('homePreviewToggle');
+  if(hp) hp.textContent=S.homePreviewMode==='photos'?L.previewPhotos:L.previewAlbums;
   // View toggle
   btnViewToggle.textContent=S.albumMode==='grid'?L.feedView:L.gridView;
   // compat note
   const cn=$('compatNote');
   if(cn && !window.showDirectoryPicker) cn.innerHTML=L.compatError;
   else if(cn) cn.textContent=L.note;
+  renderCompatibilityStatus();
   // Live placeholders in album/lightbox
   document.querySelectorAll('.albumMetaTitle').forEach(el=>el.placeholder=L.albumTitle);
   document.querySelectorAll('.albumMetaDesc').forEach(el=>el.placeholder=L.albumDesc);
@@ -1899,6 +2075,7 @@ const S = {
   albums:[], currentAlbum:null, currentIdx:0,
   view:'welcome', albumMode:'feed', gridCols:3,
   rootDirHandle:null, rootAbsPath:null, rootName:null,
+  defaultFolderCategories:[],
   activeTags:new Set(),
   expandedL1s:new Set(),
   expandedL2s:new Set(),
@@ -1911,7 +2088,19 @@ const S = {
   timelineMode:false,
   mapMode:false,
   activeLocation:null,
+  homePreviewMode:'albums',
+  activeFolderCategoryParent:null,
+  showVideoCoverPhotos:false,
+  filterCollapsed:false,
+  filterAutoCollapseLocked:false,
+  filterAutoCollapsedHint:false,
+  filterManualExpandLock:false,
+  lastHomeScrollTop:0,
+  filterToggleCooldownUntil:0,
 };
+try{ if(localStorage.getItem('home-preview-mode')==='photos') S.homePreviewMode='photos'; }catch{}
+try{ if(localStorage.getItem('show-video-cover-photos')==='1') S.showVideoCoverPhotos=true; }catch{}
+try{ if(localStorage.getItem('filter-auto-collapse-locked')==='1') S.filterAutoCollapseLocked=true; }catch{}
 
 // ── Storage ───────────────────────────────────────────────────────────────
 const FAV_KEY='local-ig-favs';
@@ -1977,6 +2166,81 @@ function autoDetectTags(alb){
 
   return [...tags];
 }
+function buildFolderNameDefaultTags(parts){
+  return (parts||[]).map(s=>String(s).trim()).filter(Boolean);
+}
+const preferredFolderCategoryOrder=['人','工作','吃喝','行','住','玩乐','备忘'];
+function getFolderCategoryGroupsForToggle(){
+  const preferred=new Set(preferredFolderCategoryOrder);
+  return buildFolderDefaultCategoryGroups().filter(group=>preferred.has(tagName(group.l1)));
+}
+function getFolderCategoryTagSets(){
+  const parentTags=new Set(), childTags=new Set(), rawTags=new Set();
+  getFolderCategoryGroupsForToggle().forEach(group=>{
+    const parent=tagName(group.l1);
+    parentTags.add(parent);
+    (group.children||[]).forEach(child=>{
+      const childName=tagName(child.l2);
+      childTags.add(`${parent}/${childName}`);
+      rawTags.add(childName);
+    });
+  });
+  return {parentTags, childTags, rawTags};
+}
+function parseFolderCategoryName(name){
+  const raw=String(name||'').trim();
+  if(!raw) return null;
+  const dash=raw.indexOf('-');
+  if(dash<=0||dash>=raw.length-1) return {raw,parent:raw,child:null};
+  const parent=raw.slice(0,dash).trim();
+  const child=raw.slice(dash+1).trim();
+  if(!parent||!child) return {raw,parent:raw,child:null};
+  return {raw,parent,child};
+}
+function getPreferredFolderCategoryRank(name){
+  const idx=preferredFolderCategoryOrder.indexOf(name);
+  return idx===-1?Number.POSITIVE_INFINITY:idx;
+}
+function buildFolderDefaultCategoryGroups(){
+  const groups=new Map();
+  (S.defaultFolderCategories||[]).forEach((name, idx)=>{
+    const info=parseFolderCategoryName(name);
+    if(!info) return;
+    if(!groups.has(info.parent)) groups.set(info.parent,{name:info.parent,order:idx,keywords:new Set(),children:[],childSeen:new Set()});
+    const group=groups.get(info.parent);
+    group.keywords.add(info.parent.toLowerCase());
+    group.keywords.add(info.raw.toLowerCase());
+    if(info.child && !group.childSeen.has(info.raw)){
+      group.childSeen.add(info.raw);
+      group.children.push({
+        l2:{zh:info.raw,en:info.raw,th:info.raw,ja:info.raw,ko:info.raw},
+        kw:[info.raw.toLowerCase()],
+      });
+    }
+  });
+  const orderMap=new Map(preferredFolderCategoryOrder.map((name, idx)=>[name, idx]));
+  return [...groups.values()].sort((a,b)=>{
+    const aRank=orderMap.has(a.name)?orderMap.get(a.name):(preferredFolderCategoryOrder.length+a.order);
+    const bRank=orderMap.has(b.name)?orderMap.get(b.name):(preferredFolderCategoryOrder.length+b.order);
+    return aRank-bRank;
+  }).map(group=>({
+    l1:{zh:group.name,en:group.name,th:group.name,ja:group.name,ko:group.name},
+    kw:[...group.keywords],
+    children:group.children,
+    _systemDefault:true,
+    _alwaysShowArrow:group.children.length>0,
+  }));
+}
+function mergeTagLists(...lists){
+  const seen=new Set(), out=[];
+  lists.flat().forEach(tag=>{
+    if(typeof tag!=='string') return;
+    const t=tag.trim();
+    if(!t||seen.has(t)) return;
+    seen.add(t);out.push(t);
+  });
+  return out;
+}
 
 function addTag(alb, tag) {
   tag = tag.trim();
@@ -1991,6 +2255,22 @@ function removeTag(alb, tag) {
   alb.tags = (alb.tags||[]).filter(t => t !== tag);
   store.setAlbum(alb.name, { tags: alb.tags });
   scheduleWrite(alb);
+}
+
+// 改名後自動更新所有卡片的標籤（helper）
+function renameTagOnAllAlbums(oldTag, newTag) {
+  (S.albums||[]).forEach(alb=>{
+    if(!alb.tags) return;
+    let changed=false;
+    alb.tags=alb.tags.map(t=>{
+      if(t===oldTag){changed=true;return newTag;}
+      // L1改名時也處理 L1/L2 複合標籤
+      const prefix=oldTag+'/';
+      if(t.startsWith(prefix)){changed=true;return newTag+t.slice(oldTag.length);}
+      return t;
+    });
+    if(changed){store.setAlbum(alb.name,{tags:alb.tags});scheduleWrite(alb);}
+  });
 }
 
 // ── IndexedDB ─────────────────────────────────────────────────────────────
@@ -2077,6 +2357,20 @@ async function classifyDir(h){
 }
 
 // 读取一个「帖子文件夹」的所有媒体，同时处理同名 txt → per-photo caption
+function getTxtCaptionForPhoto(txtMap, photoName){
+  if(!txtMap||!photoName) return undefined;
+  const base=photoName.replace(/\.\w+$/,'');
+  if(txtMap[photoName]!==undefined) return txtMap[photoName];
+  if(txtMap[base]!==undefined) return txtMap[base];
+  return undefined;
+}
+function shouldHideVideoCoverPhoto(photo, usedCovers){
+  return !S.showVideoCoverPhotos && usedCovers.has(photo.name);
+}
+function isVisibleHomePhoto(photo){
+  return S.showVideoCoverPhotos || !photo._isVideoCover;
+}
+
 async function readPhotosFromDir(dir){
   const images=[], videos=[], txtMap={};
   let postMeta=null, notesData=null, _corruptMeta=false;
@@ -2089,10 +2383,10 @@ async function readPhotosFromDir(dir){
         try{ const file=await h.getFile(); notesData=JSON.parse(await file.text()); }catch{}
       } else if(IMG_EXT.test(name)){
         const file=await h.getFile();
-        images.push({name,file,date:null,url:null,isVideo:false});
+        images.push({name,file,handle:h,date:null,url:null,isVideo:false});
       } else if(VIDEO_EXT.test(name)){
         const file=await h.getFile();
-        videos.push({name,file,date:null,url:null,isVideo:true,poster:null});
+        videos.push({name,file,handle:h,date:null,url:null,isVideo:true,poster:null});
       } else if(name.match(/\.txt$/i)){
         // txt 文件：去掉扩展名作为 key，内容作为对应图片的 caption
         try{
@@ -2108,11 +2402,11 @@ async function readPhotosFromDir(dir){
   for(const v of videos){
     const base=v.name.replace(/\.\w+$/,'');
     const cover=images.find(p=>p.name.replace(/\.\w+$/,'')=== base);
-    if(cover){v.poster=cover;usedCovers.add(cover.name);}
+    if(cover){v.poster=cover;cover._isVideoCover=true;usedCovers.add(cover.name);}
   }
   // 展示列表：未配对图片 + 视频；保留第一张图供封面
   const firstImage=images[0]||null;
-  const photos=[...images.filter(p=>!usedCovers.has(p.name)),...videos];
+  const photos=[...images,...videos];
   photos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
 
   // 将 txtMap 注入 per-photo caption（存入 notesData.photos）
@@ -2120,15 +2414,15 @@ async function readPhotosFromDir(dir){
     notesData=notesData||{};
     notesData.photos=notesData.photos||{};
     for(const photo of photos){
-      const base=photo.name.replace(/\.\w+$/,'');
-      if(txtMap[base]!==undefined && notesData.photos[photo.name]===undefined){
-        notesData.photos[photo.name]=txtMap[base].trim();
+      const txtCaption=getTxtCaptionForPhoto(txtMap, photo.name);
+      if(txtCaption!==undefined){
+        notesData.photos[photo.name]=txtCaption.trim();
       }
     }
     // 若只有一个 txt 且名字和文件夹同名或通配，用作整体描述
     const txts=Object.values(txtMap);
     if(txts.length===1 && !notesData.desc){
-      const matchedPhoto=photos.find(p=>txtMap[p.name.replace(/\.\w+$/,'')]!==undefined);
+      const matchedPhoto=photos.find(p=>getTxtCaptionForPhoto(txtMap,p.name)!==undefined);
       if(!matchedPhoto) notesData.desc=txts[0].trim(); // 没有对应图片时作为相册描述
     }
   }
@@ -2144,10 +2438,10 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
     if(h.kind!=='file') continue;
     if(IMG_EXT.test(name)){
       const file=await h.getFile();
-      images.push({name,file,date:null,url:null,isVideo:false});
+      images.push({name,file,handle:h,date:null,url:null,isVideo:false});
     } else if(VIDEO_EXT.test(name)){
       const file=await h.getFile();
-      videos.push({name,file,date:null,url:null,isVideo:true,poster:null});
+      videos.push({name,file,handle:h,date:null,url:null,isVideo:true,poster:null});
     } else if(/\.txt$/i.test(name)){
       try{
         const file=await h.getFile();
@@ -2165,21 +2459,20 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
   for(const v of videos){
     const base=v.name.replace(/\.\w+$/,'');
     const cover=images.find(p=>p.name.replace(/\.\w+$/,'')=== base);
-    if(cover){v.poster=cover;usedCovers.add(cover.name);}
+    if(cover){v.poster=cover;cover._isVideoCover=true;usedCovers.add(cover.name);}
   }
-  const displayPhotos=[...images.filter(p=>!usedCovers.has(p.name)),...videos];
+  const displayPhotos=[...images,...videos];
 
   // 确定实际模式：auto 时按有无同名 txt 决定
   const allMedia=[...images,...videos];
-  const hasPerFileTxt=allMedia.some(p=>txtMap[p.name.replace(/\.\w+$/,'')]!==undefined);
+  const hasPerFileTxt=allMedia.some(p=>getTxtCaptionForPhoto(txtMap,p.name)!==undefined);
   const useSingle = mode==='single' || (mode==='auto' && hasPerFileTxt);
 
   if(useSingle){
     // 模式A：每张图 + 同名 txt = 一个独立相册
     const albums=[];
     for(const photo of displayPhotos){
-      const base=photo.name.replace(/\.\w+$/,'');
-      const caption=txtMap[base]||'';
+      const caption=getTxtCaptionForPhoto(txtMap, photo.name)||'';
       const albumName=`${dirName}/${photo.name}`;
       const notesData=caption?{desc:caption.trim(),photos:{}}:null;
       const postMeta={
@@ -2227,7 +2520,9 @@ async function readFolder(root){
     if(raw){
       const storedLast=raw.split(/[/\\]/).pop()||'';
       if(storedLast===root.name){
-        S.rootAbsPath=raw; // 路径正确，直接使用
+        // _path.txt 已是同名目标目录时，直接信任其保存的真实存储路径，
+        // 不再用 HTML 源码目录重写，否则会把「打开文件夹」误导到项目源码路径。
+        S.rootAbsPath=raw;
       } else {
         // 文件夹名/位置已变：优先用 ig-output-path + 当前文件夹名重建路径
         // 若未设置 ig-output-path，则仅替换最后一段（适用于纯改名场景）
@@ -2263,9 +2558,9 @@ async function readFolder(root){
         if(!name.startsWith('.')) subDirs.push({name,h});
       } else if(h.kind==='file'){
         if(IMG_EXT.test(name)){
-          try{ rootLooseImgs.push({name,file:await h.getFile(),date:null,url:null,isVideo:false}); }catch{}
+          try{ rootLooseImgs.push({name,file:await h.getFile(),handle:h,date:null,url:null,isVideo:false}); }catch{}
         } else if(VIDEO_EXT.test(name)){
-          try{ rootLooseVids.push({name,file:await h.getFile(),date:null,url:null,isVideo:true,poster:null}); }catch{}
+          try{ rootLooseVids.push({name,file:await h.getFile(),handle:h,date:null,url:null,isVideo:true,poster:null}); }catch{}
         } else if(/\.txt$/i.test(name)){
           try{ const file=await h.getFile(); rootTxtMap[name.replace(/\.txt$/i,'')]=(await file.text()).trim(); }catch{}
         }
@@ -2274,6 +2569,7 @@ async function readFolder(root){
   }
 
   // 处理子目录（每个子目录独立 try-catch，一个失败不影响其他）
+  S.defaultFolderCategories=[...new Set(subDirs.map(d=>d.name).filter(Boolean))];
   for(const {name,h} of subDirs){
     try{
       const kind=await classifyDir(h);
@@ -2317,7 +2613,7 @@ async function readFolder(root){
         }catch{}
         // 分类文件夹下直属的散图
         try{
-          const catAlbums=await readLooseDirAsAlbums(h,name,[],'auto');
+          const catAlbums=await readLooseDirAsAlbums(h,name,[name],'auto');
           catAlbums.forEach(a=>a._folderRelPath=name);
           albums.push(...catAlbums);
         }catch{}
@@ -2331,18 +2627,18 @@ async function readFolder(root){
     for(const v of rootLooseVids){
       const base=v.name.replace(/\.\w+$/,'');
       const cover=rootLooseImgs.find(p=>p.name.replace(/\.\w+$/,'')=== base);
-      if(cover){v.poster=cover;usedCovers.add(cover.name);}
+      if(cover){v.poster=cover;cover._isVideoCover=true;usedCovers.add(cover.name);}
     }
-    const rootPhotos=[...rootLooseImgs.filter(p=>!usedCovers.has(p.name)),...rootLooseVids];
+    const rootPhotos=[...rootLooseImgs,...rootLooseVids];
     rootPhotos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
     // 注入 txt captions 到 rootNotesData
     if(Object.keys(rootTxtMap).length){
       rootNotesData=rootNotesData||{};
       rootNotesData.photos=rootNotesData.photos||{};
       for(const p of rootPhotos){
-        const base=p.name.replace(/\.\w+$/,'');
-        if(rootTxtMap[base]&&!rootNotesData.photos[p.name])
-          rootNotesData.photos[p.name]=rootTxtMap[base];
+        const txtCaption=getTxtCaptionForPhoto(rootTxtMap,p.name);
+        if(txtCaption!==undefined)
+          rootNotesData.photos[p.name]=txtCaption;
       }
     }
     albums.unshift({name:'__root__',handle:null,photos:rootPhotos,coverUrl:null,postMeta:null,rootAlbum:true,firstImage:rootLooseImgs[0]||null,notesData:rootNotesData});
@@ -2400,14 +2696,16 @@ async function readFolder(root){
     // _inheritTags 长度 2 → [L1tag, L1tag/L2name]
     const _rawInh=alb._inheritTags||[];
     let inheritTags;
+    const folderNameTags=buildFolderNameDefaultTags(_rawInh);
     if(_rawInh.length===0){
       inheritTags=[];
     } else {
       const fn1=_rawInh[0].toLowerCase();
       const group=getEffectiveHierarchy().find(g=>g.kw&&g.kw.some(kw=>fn1===kw.toLowerCase()));
       const l1Tag=group?tagName(group.l1):_rawInh[0];
+      const folderChild=group?.children?.find(c=>c.kw&&c.kw.some(kw=>fn1===kw.toLowerCase()));
       if(_rawInh.length===1){
-        inheritTags=[l1Tag];
+        inheritTags=folderChild ? [l1Tag, `${l1Tag}/${tagName(folderChild.l2)}`] : [l1Tag];
       } else {
         // L2：尝试匹配 TAG_HIERARCHY children，否则保留原名
         const l2Raw=_rawInh[1];
@@ -2415,11 +2713,12 @@ async function readFolder(root){
         const l2Tag=child?`${l1Tag}/${tagName(child.l2)}`:`${l1Tag}/${l2Raw}`;
         inheritTags=[l1Tag,l2Tag];
       }
+      inheritTags = mergeTagLists(inheritTags, folderNameTags);
     }
     const savedTags = nd?.tags ?? meta.tags ?? null;
     alb._hasManualTags = savedTags !== null || inheritTags.length>0;
     if(savedTags !== null){
-      alb.tags = [...inheritTags, ...savedTags.filter(t=>typeof t==='string'&&t.trim()).map(translateTag)];
+      alb.tags = mergeTagLists(inheritTags, savedTags.filter(t=>typeof t==='string'&&t.trim()).map(translateTag));
     } else if(inheritTags.length){
       alb.tags=[...inheritTags];
     } else {
@@ -2449,9 +2748,42 @@ function firstLine(text, max){
 
 // ── 备注持久化（写入 notes.json）────────────────────────────────────────────
 const _writeTimers={};
+const _photoCaptionWriteTimers={};
 function scheduleWrite(alb){
   clearTimeout(_writeTimers[alb.name]);
   _writeTimers[alb.name]=setTimeout(()=>writeNotes(alb),1200);
+}
+function getPhotoCaptionSidecarName(photo){
+  const base=photo?.name?.replace(/\.\w+$/,'')||'';
+  return photo?.isVideo ? `${photo.name}.txt` : `${base}.txt`;
+}
+async function writePhotoCaptionSidecar(alb, photo, text){
+  if(!alb||!photo) return;
+  const key=`${alb.name}::${photo.name}`;
+  const value=(text??'').replace(/\r\n/g,'\n');
+  clearTimeout(_photoCaptionWriteTimers[key]);
+  _photoCaptionWriteTimers[key]=setTimeout(async()=>{
+    const dirHandle=alb.rootAlbum ? S.rootDirHandle : alb.handle;
+    if(!dirHandle) return;
+    try{
+      const base=photo.name.replace(/\.\w+$/,'');
+      const preferred=getPhotoCaptionSidecarName(photo);
+      const fallback=preferred===`${base}.txt` ? `${photo.name}.txt` : `${base}.txt`;
+      let sidecarName=preferred;
+      try{ await dirHandle.getFileHandle(preferred); }
+      catch{
+        try{ await dirHandle.getFileHandle(fallback); sidecarName=fallback; }
+        catch{}
+      }
+      const fh=await dirHandle.getFileHandle(sidecarName,{create:true});
+      const w=await fh.createWritable();
+      await w.write(value);
+      await w.close();
+      alb.notesData=alb.notesData||{};
+      alb.notesData.photos=alb.notesData.photos||{};
+      alb.notesData.photos[photo.name]=value;
+    }catch{/* 只读/无权限时静默降级，不影响使用 */}
+  },450);
 }
 async function writeNotes(alb){
   const dirHandle=alb.rootAlbum ? S.rootDirHandle : alb.handle;
@@ -2466,7 +2798,9 @@ async function writeNotes(alb){
     // 空字符串不写入，这样下次加载时会回落到 meta.json 里的 IG 真实地址
     if(meta.location!=null && meta.location!=='') notes.location=meta.location;
     const caps=raw[alb.name]?.photos||{};
-    if(Object.keys(caps).length)  notes.photos={...caps};
+    const existingPhotos=alb.notesData?.photos||{};
+    const mergedCaps={...existingPhotos,...caps}; // notesData fills gaps; localStorage edits take priority
+    if(Object.keys(mergedCaps).length) notes.photos=mergedCaps;
     if(meta.tags?.length)         notes.tags=meta.tags;
 
     const fh=await dirHandle.getFileHandle('notes.json',{create:true});
@@ -2477,6 +2811,25 @@ async function writeNotes(alb){
   }catch{/* 只读/无权限时静默降级，不影响使用 */}
 }
 
+// Recovery: sync all in-memory notesData.photos → localStorage + re-write notes.json
+// Runs automatically after each folder load to repair any notes.json missing photos
+function recoverNotesFromMemory(){
+  let count=0;
+  (S.albums||[]).forEach(alb=>{
+    const memPhotos=alb.notesData?.photos;
+    if(!memPhotos||!Object.keys(memPhotos).length) return;
+    const raw=store._d();
+    const existing=raw[alb.name]?.photos||{};
+    const merged={...memPhotos,...existing}; // existing localStorage edits win over notesData
+    if(!raw[alb.name]) raw[alb.name]={};
+    raw[alb.name].photos=merged;
+    try{localStorage.setItem('ig-notes',JSON.stringify(raw));}catch{}
+    scheduleWrite(alb);
+    count++;
+  });
+  if(count>0) toast(`已恢復 ${count} 個相冊的備注`);
+}
+
 // ── DOM ───────────────────────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
 const btnBack=$('btnBack'), btnOpen=$('btnOpen'), btnViewToggle=$('btnViewToggle'), btnSort=$('btnSort'), btnMediaFilter=$('btnMediaFilter');
@@ -2484,6 +2837,7 @@ const hdrTitle=$('hdrTitle'), toastEl=$('toast');
 const lbImg=$('lbImg'), lbCaption=$('lbCaption');
 const lbPrev=$('lbPrev'), lbNext=$('lbNext');
 const lbCounter=$('lbCounter'), lbDate=$('lbDate');
+$('lbCaptionIcon').addEventListener('click',()=>lbCaption.focus());
 let toastTimer;
 
 function toast(msg,dur=2400){
@@ -2497,6 +2851,7 @@ function showView(name){
   ['vWelcome','vRestore','vHome','vMap','vAlbum','vLB'].forEach(id=>$(id).classList.remove('on'));
   $({welcome:'vWelcome',restore:'vRestore',home:'vHome',map:'vMap',album:'vAlbum',lb:'vLB'}[name]).classList.add('on');
   S.view=name;
+  syncHomeHeaderModes();
 }
 function isVideoAlbum(alb){
   const photos=alb.photos, n=photos.length, vc=photos.filter(p=>p.isVideo).length;
@@ -2653,7 +3008,7 @@ function updateGridBtn(){
 }
 function openLB(alb,idx){
   S.currentAlbum=alb;S.currentIdx=idx;
-  renderLB();showView('lb');$('hdr').style.display='none';
+  showView('lb');renderLB();$('hdr').style.display='none';
 }
 // _slideshowTimer defined later; stopSlideshow() is a forward-callable fn reference
 function closeLB(){
@@ -2804,15 +3159,18 @@ function buildL2Row(l1,l2counts,l3Map){
 
 function buildFilterBar(){
   const l1Counts=new Map(),l2Map=new Map(),l3Map=new Map();
-  const classifiedSuffixes=new Set();
+  const folderTagSets=getFolderCategoryTagSets();
   S.albums.forEach(alb=>{
     const seenL1=new Set(),seenL2=new Set();
+    const classifiedSuffixes=new Set();
     (alb.tags||[]).forEach(tag=>{
+      if(folderTagSets.parentTags.has(tag)||folderTagSets.childTags.has(tag)||folderTagSets.rawTags.has(tag)) return;
       const slash=tag.indexOf('/');
       if(slash===-1) return;
       classifiedSuffixes.add(tag.slice(slash+1));
     });
     (alb.tags||[]).forEach(tag=>{
+      if(folderTagSets.parentTags.has(tag)||folderTagSets.childTags.has(tag)||folderTagSets.rawTags.has(tag)) return;
       const slash=tag.indexOf('/');
       if(slash===-1){
         if(!classifiedSuffixes.has(tag)){
@@ -2862,7 +3220,12 @@ function buildFilterBar(){
 
   // 合併：有素材的 L1（按數量排序）+ 無素材的 L1（按 hierarchy 順序）
   const effectiveL1s=getEffectiveHierarchy().map(g=>tagName(g.l1));
-  const presentEntries=[...l1Counts.entries()].sort((a,b)=>b[1]-a[1]);
+  const presentEntries=[...l1Counts.entries()].sort((a,b)=>{
+    const aRank=getPreferredFolderCategoryRank(a[0]);
+    const bRank=getPreferredFolderCategoryRank(b[0]);
+    if(aRank!==bRank) return aRank-bRank;
+    return b[1]-a[1];
+  });
   const presentSet=new Set(presentEntries.map(([l1])=>l1));
   const absentEntries=effectiveL1s.filter(l1=>!presentSet.has(l1)).map(l1=>[l1,0]);
   const allEntries=[...presentEntries,...absentEntries];
@@ -3072,7 +3435,7 @@ const TagManager=(function(){
         const inp=_mk('input','tmInp');inp.value=name;inp.style.flex='1';
         const ok=_mk('button','tmSaveBtn','儲存');
         const cancel=_mk('button','tmCancelBtn','✕');
-        const doSave=()=>{const n=inp.value.trim();if(!n){inp.focus();return;}onEdit(li,n);};
+        const doSave=()=>{const n=inp.value.trim();if(!n){inp.focus();return;}onEdit(li,name,n);};
         ok.addEventListener('click',doSave);
         cancel.addEventListener('click',()=>form.remove());
         inp.addEventListener('keydown',e=>{
@@ -3131,7 +3494,8 @@ const TagManager=(function(){
     // ── 預設分類 ────────────────────────────────────────────
     body.appendChild(_mk('div','tmSecHdr','預設分類（無法刪除）'));
 
-    TAG_HIERARCHY.forEach(group=>{
+    const builtinGroups=[...TAG_HIERARCHY, ...buildFolderDefaultCategoryGroups()];
+    builtinGroups.forEach(group=>{
       const origKey=tagName(group.l1);
       const ov=(cfg.overrides||{})[origKey]||{};
       const displayName=ov.name||origKey;
@@ -3145,6 +3509,10 @@ const TagManager=(function(){
       const row=_mk('div','tmL1Row');
       const dot=_mk('span','tmDot');
       const nameEl=_mk('span','tmL1Name',displayName);
+      if(group._systemDefault){
+        const badge=_mk('span','tmCustomBadge','資料夾');
+        row.appendChild(badge);
+      }
       const kwBadge=_mk('span','tmKwBadge',kws.length+' kw');
       kwBadge.title='點擊編輯關鍵字';
       kwBadge.style.cursor='pointer';
@@ -3173,7 +3541,7 @@ const TagManager=(function(){
         requestAnimationFrame(()=>{inp.focus();inp.select();});
       });
       // ▼ L2 / 佔位 — 放最前面
-      const hasL2=(builtinL2&&builtinL2.length>0)||extras.length>0||group._useLocationAsL2;
+      const hasL2=(builtinL2&&builtinL2.length>0)||extras.length>0||group._useLocationAsL2||group._alwaysShowArrow;
       let expEl;
       if(hasL2){
         expEl=_mk('button','tmBtn',_expandedL1s.has(origKey)?'▲ L2':'▼ L2');
@@ -3197,6 +3565,8 @@ const TagManager=(function(){
         const cancel=_mk('button','tmCancelBtn','✕');
         const doSave=()=>{
           const n=inp.value.trim();if(!n){inp.focus();return;}
+          // 自動同步：所有卡片的舊標籤 → 新標籤
+          renameTagOnAllAlbums(origKey,n);
           const c2=loadTagConfig();
           if(!c2.overrides)c2.overrides={};
           c2.overrides[origKey]=Object.assign(c2.overrides[origKey]||{},{name:n});
@@ -3235,7 +3605,7 @@ const TagManager=(function(){
           ];
           const l2Sec=_buildL2Section(
             l2List,
-            (li,nn)=>{
+            (li,oldName,nn)=>{
               const c2=loadTagConfig();
               const bLen=(builtinL2||[]).length;
               if(li<bLen){
@@ -3250,6 +3620,8 @@ const TagManager=(function(){
                 if(!c2.extraL2[origKey])c2.extraL2[origKey]=[];
                 c2.extraL2[origKey][exIdx].l2={zh:nn,en:nn,th:nn,ja:nn,ko:nn};
               }
+              // 自動同步：所有卡片上的舊 L2 標籤 → 新 L2 標籤
+              renameTagOnAllAlbums(origKey+'/'+oldName,origKey+'/'+nn);
               saveTagConfig(c2);_render();
             },
             (li)=>{
@@ -3418,6 +3790,11 @@ const TagManager=(function(){
     const addBtn=_mk('button','tmSaveBtn','＋ 新增');
     addBtn.addEventListener('click',()=>{
       const n=nInp.value.trim();if(!n){nInp.focus();return;}
+      // 檢查是否與預設 L1 重名
+      const allDefault=TAG_HIERARCHY.map(g=>tagName(g.l1));
+      if(allDefault.some(name=>name===n)){
+        toast('⚠️ 此名稱已存在於預設分類中',2500);return;
+      }
       const kws=kInp.value.split(',').map(k=>k.trim()).filter(Boolean);
       const initL2s=l2InitInp.value.split(',').map(s=>s.trim()).filter(Boolean);
       const c2=loadTagConfig();
@@ -3587,14 +3964,317 @@ function renderHomeGrid(container){
   container.appendChild(grid);
 }
 
+function renderHomePhotoGrid(container){
+  container.innerHTML='';
+  const filtered=getFilteredAlbums();
+  const itemsByAlbum=new Map();
+  filtered.forEach(alb=>{
+    itemsByAlbum.set(alb.name, alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover).map((photo,photoIdx)=>({alb,photo,photoIdx})));
+  });
+  if(!itemsByAlbum.size){
+    container.innerHTML=`<div class="empty">${t('noTagResult')}</div>`;return;
+  }
+  itemsByAlbum.forEach((items, albName)=>{
+    const group=document.createElement('div');group.className='homePhotoGroup';
+    const groupTitle=document.createElement('div');groupTitle.className='homePhotoGroupTitle';
+    const alb=items[0].alb;
+    const visiblePhotos=alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover);
+    groupTitle.textContent=`${alb.title||albName} · ${items.length} ${t('previewPhotos')}`;
+    group.appendChild(groupTitle);
+    const grid=document.createElement('div');grid.className='homeGrid';
+    items.forEach(({alb,photo,photoIdx})=>{
+      const card=document.createElement('div');card.className='albumCard';
+
+      if(photo.isVideo){
+        if(photo.poster?.file){
+          const img=document.createElement('img');
+          const obs=new IntersectionObserver(e=>{
+            if(e[0].isIntersecting){
+              if(!photo.poster.url) photo.poster.url=URL.createObjectURL(photo.poster.file);
+              img.src=photo.poster.url;obs.disconnect();
+            }
+          },{rootMargin:'200px'});
+          obs.observe(img);
+          card.appendChild(img);
+        } else {
+          const vid=document.createElement('video');
+          vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.disablePictureInPicture=true;
+          const obs=new IntersectionObserver(e=>{
+            if(e[0].isIntersecting){
+              if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+              vid.src=photo.url;
+              vid.addEventListener('loadeddata',()=>{
+                try{vid.currentTime=0.01;}catch{}
+              },{once:true});
+              obs.disconnect();
+            }
+          },{rootMargin:'200px'});
+          obs.observe(vid);
+          card.appendChild(vid);
+        }
+        const b=document.createElement('div');b.className='multiIcon';b.textContent='▶';card.appendChild(b);
+      } else {
+        const img=document.createElement('img');
+        const obs=new IntersectionObserver(e=>{
+          if(e[0].isIntersecting){
+            if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+            img.src=photo.url;obs.disconnect();
+          }
+        },{rootMargin:'200px'});
+        obs.observe(img);
+        card.appendChild(img);
+      }
+
+      const ov=document.createElement('div');ov.className='overlay';
+      const posEl=document.createElement('div');posEl.className='cardPos';
+      posEl.textContent=`${photoIdx+1} / ${visiblePhotos.length}`;
+      ov.appendChild(posEl);
+      const aName=document.createElement('div');aName.className='aName';
+      if(S.searchQuery){aName.innerHTML=hlText(alb.title,S.searchQuery);} else {aName.textContent=alb.title;}
+      ov.appendChild(aName);
+      const metaEl=document.createElement('div');metaEl.className='homePhotoMeta';
+      metaEl.textContent=t('previewPhotoIndex')(photoIdx+1,visiblePhotos.length);
+      ov.appendChild(metaEl);
+      card.appendChild(ov);
+      card.addEventListener('click',e=>{
+        if(S.batchMode){
+          e.stopPropagation();
+          if(S.batchSelected.has(alb.name)) S.batchSelected.delete(alb.name);
+          else S.batchSelected.add(alb.name);
+          card.classList.toggle('selected',S.batchSelected.has(alb.name));
+          updateBatchBar();
+          return;
+        }
+        openLB(alb,alb.photos.indexOf(photo));
+      });
+      card.addEventListener('contextmenu',e=>{
+        e.preventDefault();
+        if(!S.batchMode) enterBatchMode();
+        S.batchSelected.add(alb.name);
+        card.classList.add('selected');
+        updateBatchBar();
+      });
+      if(S.batchSelected.has(alb.name)) card.classList.add('selected');
+      const selCheck=document.createElement('div');selCheck.className='selCheck';
+      card.appendChild(selCheck);
+      grid.appendChild(card);
+    });
+    group.appendChild(grid);
+    container.appendChild(group);
+  });
+}
+
+function buildFilterSection(){
+  const section=document.createElement('div');
+  section.className='filterSection'+(S.filterCollapsed?' collapsed':'');
+  section.id='filterSection';
+  section.appendChild(buildFilterBar());
+  return section;
+}
+function clearFolderCategoryActiveTags(){
+  const {parentTags, childTags}=getFolderCategoryTagSets();
+  [...S.activeTags].forEach(tag=>{
+    if(parentTags.has(tag)||childTags.has(tag)) S.activeTags.delete(tag);
+  });
+}
+function normalizeActiveFolderCategoryParent(){
+  if(!S.activeFolderCategoryParent) return;
+  const parent=S.activeFolderCategoryParent;
+  const stillActive=[...S.activeTags].some(tag=>tag===parent||tag.startsWith(parent+'/'));
+  if(!stillActive) S.activeFolderCategoryParent=null;
+}
+function buildFolderCategoryToggleBar(){
+  const groups=getFolderCategoryGroupsForToggle();
+  if(!groups.length) return null;
+  normalizeActiveFolderCategoryParent();
+  const bar=document.createElement('div');bar.className='homePreviewBar folderCategoryToggleBar';bar.id='folderCategoryToggleBar';
+  groups.forEach(group=>{
+    const parent=tagName(group.l1);
+    const childItems=(group.children||[]).map(child=>({label:tagName(child.l2), tag:`${parent}/${tagName(child.l2)}`}));
+    const childActiveTag=childItems.find(item=>S.activeTags.has(item.tag));
+    const isParentFilterActive=S.activeTags.has(parent)&&!childActiveTag;
+    const isActive=(S.activeFolderCategoryParent===parent)||isParentFilterActive||!!childActiveTag;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='homePreviewBtn folderCategoryParentBtn'+(isActive?' active':'');
+    btn.textContent=parent;
+    btn.addEventListener('click',()=>{
+      if(isParentFilterActive){
+        clearFolderCategoryActiveTags();
+        S.activeFolderCategoryParent=null;
+      } else {
+        clearFolderCategoryActiveTags();
+        S.activeFolderCategoryParent=parent;
+        S.activeTags.add(parent);
+      }
+      refreshHomeFilter();
+    });
+    bar.appendChild(btn);
+    if(isActive&&group.children.length){
+      childItems.forEach(item=>{
+        const childActive=S.activeTags.has(item.tag);
+        const childBtn=document.createElement('button');
+        childBtn.type='button';
+        childBtn.className='homePreviewExtraBtn folderCategoryChildBtn'+(childActive?' active':'');
+        childBtn.textContent=item.label;
+        childBtn.addEventListener('click',()=>{
+          clearFolderCategoryActiveTags();
+          S.activeFolderCategoryParent=parent;
+          S.activeTags.add(item.tag);
+          refreshHomeFilter();
+        });
+        bar.appendChild(childBtn);
+      });
+    }
+  });
+  return bar;
+}
+function syncFilterCollapseBtn(){
+  const btn=$('filterCollapseBtn');
+  if(!btn) return;
+  btn.title=S.filterCollapsed?'展開標籤欄':'收起標籤欄';
+  btn.textContent=S.filterCollapsed?'▾':'▴';
+  btn.classList.toggle('autoHint', S.filterAutoCollapsedHint);
+}
+function syncFilterLockBtn(){
+  const btn=$('filterLockBtn');
+  if(!btn) return;
+  btn.title=S.filterAutoCollapseLocked?'自動收起已鎖定':'自動收起已關閉';
+  btn.textContent=S.filterAutoCollapseLocked?'🔒':'🔓';
+  btn.classList.toggle('active', S.filterAutoCollapseLocked);
+}
 function refreshHomeFilter(){
   const el=$('vHome');
-  const fb=$('filterBar');
-  const newBar=buildFilterBar();
-  if(fb) fb.replaceWith(newBar);
-  else{const st=$('stickyTop');if(st) st.appendChild(newBar); else el.insertBefore(newBar,el.firstChild);}
-  const gc=$('homeGridWrap');if(gc) renderHomeGrid(gc);
+  const oldBar=$('folderCategoryToggleBar');
+  if(oldBar) oldBar.replaceWith(buildFolderCategoryToggleBar());
+  const section=$('filterSection');
+  const newSection=buildFilterSection();
+  if(section) section.replaceWith(newSection);
+  else{const st=$('stickyTop');if(st) st.appendChild(newSection); else el.insertBefore(newSection,el.firstChild);}
+  const gc=$('homeGridWrap');if(gc){
+    if(S.timelineMode) renderTimeline(gc);
+    else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+    else renderHomeGrid(gc);
+  }
   const sr=$('homeStatsRow');if(sr) updateStatsRow(sr);
+  syncFilterCollapseBtn();
+}
+function handleHomeScroll(){
+  if(S.view!=='home') return;
+  const home=$('vHome');
+  if(!home) return;
+  const scrollTop=home.scrollTop||0;
+  if(!S.filterAutoCollapseLocked){
+    S.lastHomeScrollTop=scrollTop;
+    return;
+  }
+  if(S.filterManualExpandLock){
+    if(scrollTop < S.lastHomeScrollTop) S.filterManualExpandLock=false;
+    else { S.lastHomeScrollTop=scrollTop; return; }
+  }
+  if(Date.now() < S.filterToggleCooldownUntil){
+    S.lastHomeScrollTop=scrollTop;
+    return;
+  }
+  if(scrollTop>120 && scrollTop>S.lastHomeScrollTop && !S.filterCollapsed){
+    S.filterCollapsed=true;
+    S.filterAutoCollapsedHint=true;
+    const section=$('filterSection');
+    if(section) section.replaceWith(buildFilterSection());
+    syncFilterCollapseBtn();
+  }
+  S.lastHomeScrollTop=scrollTop;
+}
+
+function buildHomePreviewBar(){
+  const bar=document.createElement('div');bar.className='homePreviewBar';bar.id='homePreviewBar';
+  const modes=[
+    {key:'albums',label:t('previewAlbums')},
+    {key:'photos',label:t('previewPhotos')},
+  ];
+  modes.forEach(({key,label})=>{
+    const btn=document.createElement('button');
+    btn.type='button';btn.className='homePreviewBtn'+(S.homePreviewMode===key?' active':'');
+    btn.textContent=label;
+    btn.addEventListener('click',()=>{
+      S.homePreviewMode=key;
+      try{localStorage.setItem('home-preview-mode',S.homePreviewMode);}catch{}
+      const gc=$('homeGridWrap');if(gc){
+        if(S.timelineMode) renderTimeline(gc);
+        else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+        else renderHomeGrid(gc);
+      }
+      const cur=$('homePreviewBar');
+      if(cur) cur.replaceWith(buildHomePreviewBar());
+    });
+    bar.appendChild(btn);
+  });
+  const extraBtn=document.createElement('button');
+  extraBtn.type='button';
+  extraBtn.className='homePreviewExtraBtn'+(S.showVideoCoverPhotos?' active':'');
+  extraBtn.textContent=t('previewShowVideoCovers');
+  extraBtn.style.display=S.homePreviewMode==='photos'?'':'none';
+  extraBtn.addEventListener('click',()=>{
+    S.showVideoCoverPhotos=!S.showVideoCoverPhotos;
+    try{localStorage.setItem('show-video-cover-photos',S.showVideoCoverPhotos?'1':'0');}catch{}
+    const gc=$('homeGridWrap');if(gc){
+      if(S.timelineMode) renderTimeline(gc);
+      else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+      else renderHomeGrid(gc);
+    }
+    const sr=$('homeStatsRow');if(sr) updateStatsRow(sr);
+    const cur=$('homePreviewBar');
+    if(cur) cur.replaceWith(buildHomePreviewBar());
+  });
+  bar.appendChild(extraBtn);
+  return bar;
+}
+function syncHomeHeaderModes(){
+  const hdr=$('hdr'), row=$('hdrHomeModes'), home=$('vHome');
+  if(!hdr||!row||!home) return;
+  const enabled=S.view==='home' && !!S.albums.length;
+  hdr.classList.toggle('homeModesOn', enabled);
+  home.classList.toggle('homeModesOn', enabled);
+  row.innerHTML='';
+  if(!enabled) return;
+  const modes=[
+    {key:'albums',label:t('previewAlbums')},
+    {key:'photos',label:t('previewPhotos')},
+  ];
+  modes.forEach(({key,label})=>{
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='hdrHomeModeBtn'+(S.homePreviewMode===key?' active':'');
+    btn.textContent=label;
+    btn.addEventListener('click',()=>{
+      S.homePreviewMode=key;
+      try{localStorage.setItem('home-preview-mode',S.homePreviewMode);}catch{}
+      const gc=$('homeGridWrap');if(gc){
+        if(S.timelineMode) renderTimeline(gc);
+        else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+        else renderHomeGrid(gc);
+      }
+      syncHomeHeaderModes();
+    });
+    row.appendChild(btn);
+  });
+  const extraBtn=document.createElement('button');
+  extraBtn.type='button';
+  extraBtn.className='hdrHomeModeExtraBtn'+(S.showVideoCoverPhotos?' active':'');
+  extraBtn.textContent=t('previewShowVideoCovers');
+  extraBtn.hidden=S.homePreviewMode!=='photos';
+  extraBtn.addEventListener('click',()=>{
+    S.showVideoCoverPhotos=!S.showVideoCoverPhotos;
+    try{localStorage.setItem('show-video-cover-photos',S.showVideoCoverPhotos?'1':'0');}catch{}
+    const gc=$('homeGridWrap');if(gc){
+      if(S.timelineMode) renderTimeline(gc);
+      else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+      else renderHomeGrid(gc);
+    }
+    const sr=$('homeStatsRow');if(sr) updateStatsRow(sr);
+    syncHomeHeaderModes();
+  });
+  row.appendChild(extraBtn);
 }
 
 function buildSearchBar(){
@@ -3604,19 +4284,53 @@ function buildSearchBar(){
   inp.value=S.searchQuery;
   const clr=document.createElement('button');clr.id='homeSearchClear';clr.textContent='×';clr.title='清除搜尋';
   clr.style.display=S.searchQuery?'':'none';
+  const btn=document.createElement('button');
+  btn.type='button';btn.id='filterCollapseBtn';
+  btn.addEventListener('click',()=>{
+    S.filterCollapsed=!S.filterCollapsed;
+    S.filterAutoCollapsedHint=false;
+    S.filterManualExpandLock=!S.filterCollapsed;
+    S.lastHomeScrollTop=$('vHome')?.scrollTop ?? S.lastHomeScrollTop;
+    S.filterToggleCooldownUntil=Date.now() + 600;
+    const cur=$('filterSection');
+    if(cur) cur.replaceWith(buildFilterSection());
+    syncFilterCollapseBtn();
+  });
+  syncFilterCollapseBtn();
+  const lockBtn=document.createElement('button');
+  lockBtn.type='button';lockBtn.id='filterLockBtn';
+  lockBtn.addEventListener('click',()=>{
+    S.filterAutoCollapseLocked=!S.filterAutoCollapseLocked;
+    try{localStorage.setItem('filter-auto-collapse-locked',S.filterAutoCollapseLocked?'1':'0');}catch{}
+    if(!S.filterAutoCollapseLocked){
+      S.filterAutoCollapsedHint=false;
+      S.filterManualExpandLock=false;
+    }
+    syncFilterLockBtn();
+    syncFilterCollapseBtn();
+  });
+  syncFilterLockBtn();
   inp.addEventListener('input',()=>{
     S.searchQuery=inp.value;
     clr.style.display=inp.value?'':'none';
-    const gc=$('homeGridWrap');if(gc) renderHomeGrid(gc);
+    const gc=$('homeGridWrap');if(gc){
+      if(S.timelineMode) renderTimeline(gc);
+      else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+      else renderHomeGrid(gc);
+    }
     const sr=$('homeStatsRow');if(sr) updateStatsRow(sr);
   });
   clr.addEventListener('click',()=>{
     S.searchQuery='';inp.value='';clr.style.display='none';
-    const gc=$('homeGridWrap');if(gc) renderHomeGrid(gc);
+    const gc=$('homeGridWrap');if(gc){
+      if(S.timelineMode) renderTimeline(gc);
+      else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
+      else renderHomeGrid(gc);
+    }
     const sr=$('homeStatsRow');if(sr) updateStatsRow(sr);
     inp.focus();
   });
-  wrap.appendChild(inp);wrap.appendChild(clr);
+  wrap.appendChild(inp);wrap.appendChild(clr);wrap.appendChild(btn);wrap.appendChild(lockBtn);
   return wrap;
 }
 function updateStatsRow(el){
@@ -3635,11 +4349,14 @@ function updateStatsRow(el){
 }
 function renderHome(){
   const el=$('vHome');el.innerHTML='';
-  if(!S.albums.length){el.innerHTML=`<div class="empty">${t('noPhotos')}</div>`;return;}
+  if(!S.albums.length){el.innerHTML=`<div class="empty">${t('noPhotos')}</div>`;syncHomeHeaderModes();return;}
+  S.lastHomeScrollTop=0;
   const stickyTop=document.createElement('div');
   stickyTop.id='stickyTop';
   stickyTop.appendChild(buildSearchBar());
-  stickyTop.appendChild(buildFilterBar());
+  const folderToggleBar=buildFolderCategoryToggleBar();
+  if(folderToggleBar) stickyTop.appendChild(folderToggleBar);
+  stickyTop.appendChild(buildFilterSection());
   el.appendChild(stickyTop);
   const statsRow=document.createElement('div');statsRow.className='statsRow';statsRow.id='homeStatsRow';
   updateStatsRow(statsRow);
@@ -3647,7 +4364,9 @@ function renderHome(){
   const gc=document.createElement('div');gc.id='homeGridWrap';
   el.appendChild(gc);
   if(S.timelineMode) renderTimeline(gc);
+  else if(S.homePreviewMode==='photos') renderHomePhotoGrid(gc);
   else renderHomeGrid(gc);
+  syncHomeHeaderModes();
 }
 
 function renderTimeline(container){
@@ -3668,7 +4387,7 @@ function renderTimeline(container){
   const sortedKeys=[...groups.keys()].sort((a,b)=>{
     if(a==='未知日期') return 1;
     if(b==='未知日期') return -1;
-    return b.localeCompare(a);
+    return S.sortMode==='date-asc' ? a.localeCompare(b) : b.localeCompare(a);
   });
   const total=filtered.length;
   let globalIdx=0;
@@ -3694,7 +4413,9 @@ function renderTagEditor(alb, container){
 
   function refreshSug(){
     while(sugRow.children.length>1) sugRow.removeChild(sugRow.lastChild);
-    const remaining=[...autoDetectTags(alb),...getQuickTags()]
+    // 從有效 hierarchy 收集所有 L1 標籤（含自定義 + 已改名）
+    const hierarchyL1=getEffectiveHierarchy().map(g=>tagName(g.l1));
+    const remaining=[...autoDetectTags(alb),...getQuickTags(),...hierarchyL1]
       .filter((s,i,a)=>a.indexOf(s)===i)
       .filter(s=>!(alb.tags||[]).some(t=>t===s||t.startsWith(s+'/')||s.startsWith(t+'/')));
     remaining.forEach(tag=>{
@@ -3888,6 +4609,14 @@ function renderAlbum(alb){
 
     // 日期 + 地点行
     const dateRow=document.createElement('div');dateRow.className='postDateRow';
+    // 位置標記 N/M
+    const nPhotos=alb.photos.length;
+    if(nPhotos>1){
+      const posEl=document.createElement('span');posEl.className='postDate';
+      posEl.style.marginRight='8px';posEl.style.opacity='.45';
+      posEl.textContent=`${idx+1} / ${nPhotos}`;
+      dateRow.appendChild(posEl);
+    }
     const dateEl=document.createElement('span');dateEl.className='postDate';dateEl.textContent=fmtDate(photo.date);
     dateRow.appendChild(dateEl);
     if(alb.location&&idx===0){
@@ -3912,6 +4641,7 @@ function renderAlbum(alb){
     ta.addEventListener('input',()=>{
       ar(ta);store.setCaption(alb.name,photo.name,ta.value);
       if(S.view==='lb'&&S.currentIdx===idx) lbCaption.value=ta.value;
+      writePhotoCaptionSidecar(alb, photo, ta.value);
       scheduleWrite(alb);
     });
     setTimeout(()=>ar(ta),0);
@@ -3953,10 +4683,13 @@ function renderLB(){
   if(alb.igUrl){igA.href=alb.igUrl;igA.textContent=alb.fromXHS?'↗ 小紅書':t('igLinkShort');igA.style.display='';}
   else igA.style.display='none';
 
-  // 文案
-  const saved=store.getCaption(alb.name,photo.name);
-  lbCaption.value=saved!==null?saved:'';
+  // 文案（與 feed 模式一致：優先 notesData，其次 localStorage，index 0 fallback 相冊文案）
+  const ndCap=alb.notesData?.photos?.[photo.name];
+  const saved=ndCap!==undefined?ndCap:store.getCaption(alb.name,photo.name);
+  lbCaption.value=saved!==null?saved:(idx===0&&alb.desc?alb.desc:'');
+  lbCaption.classList.toggle('empty', !lbCaption.value.trim());
   ar(lbCaption);
+  setTimeout(()=>ar(lbCaption),0);
   const lbFoot=document.querySelector('.lbFoot');
   const prevActs=lbFoot.querySelector('.lbActions');
   if(prevActs) lbFoot.removeChild(prevActs);
@@ -3977,7 +4710,7 @@ function renderLB(){
   lbBM.dataset.action='move';
   lbBM.innerHTML=`↗ <span class="lbActBtnLabel">${t('movePhoto')||'移动'}</span>`;
   lbBM.addEventListener('click',()=>openMoveModal(alb,photo));
-  lbActs.append(lbBV,lbBC,lbBF,lbBM);lbFoot.insertBefore(lbActs,lbCaption);
+  lbActs.append(lbBV,lbBC,lbBF,lbBM);lbFoot.insertBefore(lbActs,lbFoot.querySelector('.lbCaptionWrap'));
   lbPrev.disabled=idx===0;lbNext.disabled=idx===alb.photos.length-1;
 }
 function lbMove(dir){
@@ -4067,6 +4800,7 @@ async function doLoadFolder(h){
     S.rootName=h.name;
     idb.set('lastFolder',h).catch(()=>{});
     S.albums=await readFolder(h);
+    recoverNotesFromMemory();
     goHome();
   }catch(e){
     idb.set('lastFolder',null).catch(()=>{});
@@ -4078,11 +4812,37 @@ async function doLoadFolder(h){
 }
 
 // ── Open folder ───────────────────────────────────────────────────────────
+function detectFileProtocol(){
+  if(location.protocol==='file:') return true;
+  // 某些代理/扩展可能导致 src 为空，双重确认
+  try{return window.location.href.startsWith('file://');}catch(e){return false;}
+}
 async function openFolder(){
+  // ── file:// 协议检测 ──
+  if(detectFileProtocol()){
+    toast(`
+⚠️ 無法直接選擇文件夾
+請用終端執行以下指令啟動本地服務器，然後重開此頁：
+
+  npx serve .
+  （或 python3 -m http.server）
+
+原因：Chrome 禁止 file:// 協議調用文件系統選擇器 API。`,8000);
+    console.warn('[local-ig] file:// detected — showDirectoryPicker requires a secure context (localhost/HTTPS)');
+    return;
+  }
   if(!window.showDirectoryPicker){toast(t('toastChrome'));return;}
   let root;
   try{root=await window.showDirectoryPicker({mode:'readwrite'});}
-  catch(e){if(e.name!=='AbortError') toast(t('toastNoFolder'));return;}
+  catch(e){
+    if(e.name==='AbortError') return; // 用户取消
+    console.error('[local-ig] showDirectoryPicker error:', e.name, e.message);
+    if(e.name==='SecurityError'||e.name==='NotAllowedError'||e.name==='NotSupportedError')
+      toast('⚠️ 瀏覽器限制了文件夾訪問權限。請用 localhost 服務器打開此頁面。\n\n終端執行：npx serve . 或 python3 -m http.server',8000);
+    else
+      toast(t('toastNoFolder')+' ('+e.message+')',4000);
+    return;
+  }
   await doLoadFolder(root);
 }
 
@@ -4102,10 +4862,19 @@ function hhParseFolder(name){
 }
 
 async function hhcatConvert(){
+  if(detectFileProtocol()){
+    toast('⚠️ 請用 localhost 服務器打開此頁面後再使用「導入哼哼貓」功能。\n\n終端執行：npx serve . 或 python3 -m http.server',8000);
+    return;
+  }
   if(!window.showDirectoryPicker){toast(t('toastChrome'));return;}
   let root;
   try{root=await window.showDirectoryPicker({mode:'readwrite'});}
-  catch(e){if(e.name!=='AbortError') toast(t('toastNoFolder'));return;}
+  catch(e){
+    if(e.name==='AbortError') return;
+    console.error('[local-ig] hhcatConvert showDirectoryPicker error:', e.name, e.message);
+    toast('⚠️ 無法選擇文件夾：'+e.message,4000);
+    return;
+  }
 
   // 收集用户子文件夹（含 {数字}_ 格式的帖子文件夹的那层）
   const logEl=$('hhOverlayLog');
@@ -4226,21 +4995,10 @@ async function hhcatConvert(){
     }
   }
 
-  // 写 _path.txt（仅单用户模式，且绑定了 root 就是用户目录）
-  // 注：File System Access API 无法获取真实绝对路径；
-  //     用 HTML 文件所在目录 + 文件夹名拼接作为最优估算
-  if(userDirs.length===1&&userDirs[0]===root){
-    const htmlDir=getHtmlDir();
-    // 优先用 HTML 同级目录推算绝对路径，否则退回到只写名字
-    const absGuess=htmlDir ? `${htmlDir}/${root.name}` : root.name;
-    try{
-      const pt=await root.getFileHandle('_path.txt',{create:true});
-      const pw=await pt.createWritable();
-      await pw.write(absGuess); await pw.close();
-    }catch{}
-    // 当前会话直接设置，不依赖文件读回
-    S.rootAbsPath=absGuess;
-  }
+  // 不再在瀏覽器端猜測並寫入 _path.txt。
+  // File System Access API 無法獲得真實絕對路徑；若寫入 HTML 源碼所在目錄，
+  // 會污染資料並導致「打開資料夾」複製出錯誤的源碼路徑。
+  // 因此這裡只載入相冊，不持久化猜測路徑；真正的 _path.txt 應由 Python 腳本/修復指令寫入。
 
   log(`<br><span style="color:#fff">✅ 完成  转换 ${totalDone} 个 | 已有 ${totalSkip} 个</span>`);
   subEl.textContent='';
@@ -4462,10 +5220,12 @@ lbNext.addEventListener('click',()=>lbMove(1));
 
 lbCaption.addEventListener('input',()=>{
   ar(lbCaption);
+  lbCaption.classList.toggle('empty', !lbCaption.value.trim());
   const alb=S.currentAlbum,photo=alb.photos[S.currentIdx];
   store.setCaption(alb.name,photo.name,lbCaption.value);
   const ta=$('vAlbum').querySelector(`[data-idx="${S.currentIdx}"]`);
   if(ta&&ta.value!==lbCaption.value){ta.value=lbCaption.value;ar(ta);}
+  writePhotoCaptionSidecar(alb, photo, lbCaption.value);
   scheduleWrite(alb);
 });
 
@@ -4492,7 +5252,8 @@ lbCaption.addEventListener('input',()=>{
   }
 
   // 轉換類平台使用當前開啟的資料夾本身
-  function getCurrentFolderPath(){
+  function getCurrentFolderPath(alb){
+    if(alb) return S.rootAbsPath ? `${S.rootAbsPath}/${alb.name}` : '';
     return S.rootAbsPath||'';
   }
 
@@ -4650,7 +5411,7 @@ lbCaption.addEventListener('input',()=>{
     $('igAddUser').value=guess;
     $('igAddXhsCookie').value=localStorage.getItem('xhs-cookie')||'';
     // 轉換工具：預填當前開啟的資料夾路徑
-    const folderPath=getCurrentFolderPath();
+    const folderPath=getCurrentFolderPath(alb);
     $('igAddFlatPath').value=folderPath;
     $('igAddHhcatPath').value=folderPath;
     // 重置數量
@@ -4672,6 +5433,7 @@ btnSort.addEventListener('click',()=>{
   updateSortBtn();
   renderHome();
 });
+$('vHome').addEventListener('scroll', handleHomeScroll);
 
 $('btnTimeline').addEventListener('click',()=>{
   S.timelineMode=!S.timelineMode;
@@ -4837,7 +5599,7 @@ $('btnMap').addEventListener('click',()=>{
   }
 });
 
-$('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
+$('btnAddPosts').addEventListener('click',()=>openAddPostsModal(S.currentAlbum));
 
 
 
@@ -4845,7 +5607,8 @@ $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
 (function(){
   const modal=$('transModal');
   const cmdEl=$('transCmd');
-  const copyBtn=$('transCopyBtn');
+  const copyCmdBtn=$('transCopyCmdBtn');
+  const copyPsBtn=$('transCopyPsBtn');
   let selectedLang='en';
 
   function getTransScriptPath(){
@@ -4853,16 +5616,36 @@ $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
     return dir?`${dir}/APP - deep-translator.py`:'APP - deep-translator.py';
   }
 
+  function getFreshFolderPath(){
+    if(S.rootAbsPath) return S.rootAbsPath;
+    const dir=getHtmlDir();
+    return (dir&&S.rootName)?`${dir}/${S.rootName}`:'';
+  }
+
+  function getPreferredPythonCommand(){
+    const isWin=navigator.userAgent.includes('Windows');
+    return isWin?'py -3':'python';
+  }
+
   function buildCmd(){
-    const folder=S.rootAbsPath||'';
-    return `python "${getTransScriptPath()}"${folder?' --folder "'+folder+'"':''} --lang ${selectedLang}`;
+    const folder=getFreshFolderPath();
+    return `${getPreferredPythonCommand()} "${getTransScriptPath()}"${folder?' --folder "'+folder+'"':''} --lang ${selectedLang}`;
+  }
+
+  function buildPowerShellCmd(){
+    const folder=getFreshFolderPath();
+    const base=`${getPreferredPythonCommand()} "${getTransScriptPath()}"`;
+    return folder
+      ? `& ${base} --folder "${folder}" --lang ${selectedLang}`
+      : `& ${base} --lang ${selectedLang}`;
   }
 
   function refreshCmd(){
-    const folder=S.rootAbsPath||'';
+    const folder=getFreshFolderPath();
     $('transFolderPath').textContent=folder||'（未開啟文件夾，翻譯後需手動選擇）';
     cmdEl.textContent=buildCmd();
-    copyBtn.textContent='複製命令';
+    $('transCopyCmdBtn').textContent='複製 CMD';
+    $('transCopyPsBtn').textContent='複製 PowerShell';
   }
 
   // 語言 chips
@@ -4874,19 +5657,25 @@ $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(null));
     refreshCmd();
   });
 
-  copyBtn.addEventListener('click',()=>{
-    const cmd=buildCmd();
-    navigator.clipboard?.writeText(cmd).then(()=>{
-      copyBtn.textContent='✅ 已複製！';
-      toast('命令已複製，在終端貼上執行即可開啟翻譯工具',3000);
+  function copyTransCommand(btn, text, successMsg){
+    navigator.clipboard?.writeText(text).then(()=>{
+      btn.textContent='✅ 已複製！';
+      toast(successMsg,3000);
     }).catch(()=>{
       const inp=document.createElement('input');
       inp.style.cssText='position:fixed;top:-999px';
-      inp.value=cmd;document.body.appendChild(inp);inp.select();
+      inp.value=text;document.body.appendChild(inp);inp.select();
       document.execCommand('copy');document.body.removeChild(inp);
-      copyBtn.textContent='✅ 已複製！';
+      btn.textContent='✅ 已複製！';
       toast('命令已複製',2000);
     });
+  }
+
+  copyCmdBtn.addEventListener('click',()=>{
+    copyTransCommand(copyCmdBtn, buildCmd(), 'CMD 命令已複製，在終端貼上執行即可開啟翻譯工具');
+  });
+  copyPsBtn.addEventListener('click',()=>{
+    copyTransCommand(copyPsBtn, buildPowerShellCmd(), 'PowerShell 命令已複製，在終端貼上執行即可開啟翻譯工具');
   });
 
   const refreshBtn2=$('transRefreshBtn');
@@ -5119,16 +5908,69 @@ function renderAlbumGrid(alb){
     cell.appendChild(imgWrap);
 
     // ── Caption 條 ──
+    const capWrap=document.createElement('div');
+    capWrap.className='gridCaptionWrap';
+
     const capEl=document.createElement('div');
     // 優先 notes.json per-photo，其次 localStorage，index 0 fallback 到相冊文案
     const ndCap=alb.notesData?.photos?.[photo.name];
     const savedCap=ndCap!==undefined?ndCap:store.getCaption(alb.name,photo.name);
     const capText=savedCap!==null?savedCap:(idx===0&&alb.desc?alb.desc:'');
     capEl.className='gridCaption'+(capText?'':' empty');
-    capEl.textContent=capText;
-    cell.appendChild(capEl);
+    capEl.textContent=capText||'';
 
-    cell.addEventListener('click',()=>openLB(alb,idx));
+    const capTA=document.createElement('textarea');
+    capTA.className='gridCaptionTA';
+    capTA.rows=2;
+    capTA.placeholder='寫下備注…';
+
+    const editBtn=document.createElement('button');
+    editBtn.className='gridCaptionEditBtn';
+    editBtn.textContent='✏';
+    editBtn.title='編輯備注';
+
+    function enterEdit(e){
+      if(e) e.stopPropagation();
+      capTA.value=capEl.textContent==='寫下備注…'?'':capEl.textContent;
+      capEl.style.display='none';
+      capTA.style.display='block';
+      editBtn.style.opacity='0';
+      capTA.focus();capTA.select();
+    }
+    function saveEdit(){
+      const val=capTA.value;
+      capEl.textContent=val;
+      capEl.className='gridCaption'+(val?'':' empty');
+      if(!val) capEl.textContent='';
+      capTA.style.display='none';
+      capEl.style.display='';
+      editBtn.style.opacity='';
+      // 同步更新 notesData + localStorage + notes.json
+      alb.notesData=alb.notesData||{};
+      alb.notesData.photos=alb.notesData.photos||{};
+      alb.notesData.photos[photo.name]=val;
+      store.setCaption(alb.name,photo.name,val);
+      scheduleWrite(alb);
+    }
+
+    editBtn.addEventListener('click',enterEdit);
+    capTA.addEventListener('blur',saveEdit);
+    capTA.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){e.preventDefault();capTA.value=capEl.textContent;saveEdit();}
+    });
+    // 點 caption 文字區也進入編輯（不打開 LB）
+    capEl.addEventListener('click',enterEdit);
+
+    capWrap.appendChild(capEl);
+    capWrap.appendChild(capTA);
+    capWrap.appendChild(editBtn);
+    cell.appendChild(capWrap);
+
+    cell.addEventListener('click',e=>{
+      // 若點擊來自 capWrap 內部則不開 LB
+      if(capWrap.contains(e.target)) return;
+      openLB(alb,idx);
+    });
     grid.appendChild(cell);
   });
   el.appendChild(grid);
@@ -5211,17 +6053,34 @@ function getFolderPath(alb){
   const root=S.rootName||'';
   return alb.rootAlbum ? `${base}/${root}` : `${base}/${root}/${rel}`;
 }
+function requestOpenFolderViaServer(path){
+  if(!path||!location.protocol.startsWith('http')) return Promise.resolve(false);
+  return fetch('/__open_folder__',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({path})
+  }).then(async res=>{
+    let data={};
+    try{data=await res.json();}catch{}
+    if(res.ok&&data.ok){toast(t('explorerOpenOk')||'已打開資料夾',2200);return true;}
+    throw new Error(data.error||'open_failed');
+  }).catch(()=>false);
+}
+
 function openLocalFolder(alb){
   const path=getFolderPath(alb);
   if(!path){toast(t('pathUnknown'),2800);return;}
   const isWin=navigator.userAgent.includes('Windows');
   const finalPath=isWin?path.replace(/\//g,'\\'):path;
-  navigator.clipboard.writeText(finalPath).then(()=>toast(t('folderCopied'),3500)).catch(()=>{
-    const inp=document.createElement('input');
-    inp.style.cssText='position:fixed;top:-999px;opacity:0';
-    inp.value=finalPath;document.body.appendChild(inp);inp.select();
-    document.execCommand('copy');document.body.removeChild(inp);
-    toast(t('folderCopied'),3500);
+  requestOpenFolderViaServer(finalPath).then(ok=>{
+    if(ok) return;
+    navigator.clipboard.writeText(finalPath).then(()=>toast(t('folderCopied'),3500)).catch(()=>{
+      const inp=document.createElement('input');
+      inp.style.cssText='position:fixed;top:-999px;opacity:0';
+      inp.value=finalPath;document.body.appendChild(inp);inp.select();
+      document.execCommand('copy');document.body.removeChild(inp);
+      toast((t('explorerOpenFail')||'無法直接打開，已複製路徑'),3500);
+    });
   });
 }
 function copyPhotoPath(alb,photo){
@@ -5446,6 +6305,7 @@ else { const _d=getHtmlDir(); if(_d) $('igOutput').value=_d+'/downloads'; }
 const _savedSid=localStorage.getItem('ig-session-id');
 if(_savedSid) $('igSessionId').value=_savedSid;
 applyLang();
+renderCompatibilityStatus();
 if(!window.showDirectoryPicker) $('compatNote').style.color='#ff4d4d';
 // tryRestoreFolder() 已停用：瀏覽器刷新回到歡迎界面，用 ↻ 按鈕在 session 內同步
 
