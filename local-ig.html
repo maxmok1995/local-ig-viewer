@@ -1058,6 +1058,7 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
 #deleteCancelBtn{background:var(--s2);color:var(--text);border:1px solid var(--border)!important}
 #deleteOkBtn{background:#c0392b;color:#fff}
 #deleteOkBtn:hover{opacity:.85}
+/* layout hotfix v2 */ #igPanel,#xhsPanel{max-width:min(640px,calc(100vw - 32px))!important;width:min(640px,calc(100vw - 32px))!important} .igRow{display:flex!important;flex-wrap:nowrap!important;align-items:center!important} .igStep{width:100%!important;min-width:0!important} .igStepLabel{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;white-space:nowrap!important;writing-mode:horizontal-tb!important;text-align:left!important} .igStepLabel span{flex:0 0 16px!important} .igCmdRow{display:flex!important;width:100%!important;min-width:0!important;align-items:stretch!important} .igCmd{min-width:0!important;width:0!important;flex:1 1 auto!important;overflow-wrap:anywhere!important;white-space:pre-wrap!important} .igCopyBtn{flex:0 0 58px!important;min-width:58px!important;white-space:nowrap!important;writing-mode:horizontal-tb!important;text-align:center!important} #igInput,#xhsInput,#igOutput,#igSessionId{min-width:0!important}
 </style>
 <!-- Leaflet (loaded on demand) -->
 </head>
@@ -2075,6 +2076,7 @@ const S = {
   albums:[], currentAlbum:null, currentIdx:0,
   view:'welcome', albumMode:'feed', gridCols:3,
   rootDirHandle:null, rootAbsPath:null, rootName:null,
+  rootIndexSnapshot:null, rootIndexSnapshotLoadedAt:0,
   defaultFolderCategories:[],
   activeTags:new Set(),
   expandedL1s:new Set(),
@@ -2169,10 +2171,135 @@ function autoDetectTags(alb){
 function buildFolderNameDefaultTags(parts){
   return (parts||[]).map(s=>String(s).trim()).filter(Boolean);
 }
+const STANDARD_SECOND_LEVEL_FOLDERS=[
+  '人-合照','人-摆拍','人-自拍',
+  '住-家','住-旅店',
+  '吃喝','吃喝-下午茶','吃喝-办公室','吃喝-午','吃喝-宵夜','吃喝-家','吃喝-早','吃喝-早午','吃喝-晚',
+  '备忘-IG','备忘-客户',
+  '工作-出差','工作-办公室','工作-饭局',
+  '未分类',
+  '玩乐','玩乐-山林','玩乐-市区','玩乐-海边',
+  '行-出海','行-地铁','行-自驾','行-航班',
+];
 const preferredFolderCategoryOrder=['人','工作','吃喝','行','住','玩乐','备忘'];
 function getFolderCategoryGroupsForToggle(){
   const preferred=new Set(preferredFolderCategoryOrder);
   return buildFolderDefaultCategoryGroups().filter(group=>preferred.has(tagName(group.l1)));
+}
+function isStandardSecondLevelFolderTag(tag){
+  return STANDARD_SECOND_LEVEL_FOLDERS.includes(String(tag||'').trim());
+}
+function buildCanonicalFolderCategoryTags(folderTag){
+  const info=parseFolderCategoryName(folderTag);
+  if(!info?.parent||!info?.child) return [folderTag].filter(Boolean);
+  return [info.parent, `${info.parent}/${folderTag}`, folderTag];
+}
+function getPrimaryFolderCategoryTag(alb){
+  const tags=alb?.tags||[];
+  for(const folderTag of STANDARD_SECOND_LEVEL_FOLDERS){
+    const info=parseFolderCategoryName(folderTag);
+    if(tags.includes(folderTag)) return folderTag;
+    if(info?.parent && tags.includes(`${info.parent}/${folderTag}`)) return folderTag;
+  }
+  return null;
+}
+async function resolveDirectoryHandleByRelPath(root, rel){
+  let cur=root;
+  const parts=String(rel||'').split('/').map(s=>s.trim()).filter(Boolean);
+  for(const part of parts) cur=await cur.getDirectoryHandle(part);
+  return cur;
+}
+async function isSameAlbumDirectory(srcDir, destDir){
+  try{
+    const srcMeta=await srcDir.getFileHandle('meta.json');
+    const destMeta=await destDir.getFileHandle('meta.json');
+    const srcText=await (await srcMeta.getFile()).text();
+    const destText=await (await destMeta.getFile()).text();
+    const srcJson=JSON.parse(srcText||'{}');
+    const destJson=JSON.parse(destText||'{}');
+    const srcCode=srcJson.shortcode||srcJson.code||srcJson.id||'';
+    const destCode=destJson.shortcode||destJson.code||destJson.id||'';
+    if(srcCode&&destCode&&srcCode===destCode) return true;
+  }catch{}
+  return false;
+}
+async function copyDirectoryRecursive(srcDir, destDir, options={}){
+  const skipExisting=!!options.skipExisting;
+  for await(const [name,entry] of srcDir.entries()){
+    if(entry.kind==='file'){
+      if(skipExisting){
+        try{ await destDir.getFileHandle(name); continue; }catch{}
+      }
+      const file=await entry.getFile();
+      const fh=await destDir.getFileHandle(name,{create:true});
+      const w=await fh.createWritable();
+      await w.write(await file.arrayBuffer());
+      await w.close();
+    } else if(entry.kind==='directory'){
+      const child=await destDir.getDirectoryHandle(name,{create:true});
+      await copyDirectoryRecursive(entry, child, options);
+    }
+  }
+}
+async function moveAlbumFolderToCategory(alb, folderTag){
+  if(!alb?.handle||!S.rootDirHandle) return false;
+  const currentCategory=(alb._folderRelPath||'').split('/').filter(Boolean)[0]||'';
+  if(currentCategory===folderTag) return false;
+  const srcRel = alb._folderRelPath || alb.name;
+  const srcParts=srcRel.split('/').filter(Boolean);
+  const srcName=srcParts.pop();
+  if(!srcName||srcParts.length===0) return false;
+  const srcParent=await resolveDirectoryHandleByRelPath(S.rootDirHandle, srcParts.join('/'));
+  const srcDir=await srcParent.getDirectoryHandle(srcName);
+  const destDir = await S.rootDirHandle.getDirectoryHandle(folderTag, {create:true});
+  let destName=srcName, i=1;
+  let newDir=null;
+  try{
+    const existingDir = await destDir.getDirectoryHandle(srcName);
+    if(await isSameAlbumDirectory(srcDir, existingDir)){
+      destName = srcName;
+      newDir = existingDir;
+    }
+  }catch{}
+  if(!newDir){
+    while(true){
+      try{ await destDir.getDirectoryHandle(destName); destName=`${srcName}_${i++}`; }
+      catch{ break; }
+    }
+    newDir=await destDir.getDirectoryHandle(destName,{create:true});
+  }
+  await copyDirectoryRecursive(srcDir, newDir, {skipExisting:true});
+  await srcParent.removeEntry(srcName, {recursive:true});
+  alb.handle=newDir;
+  alb.name=destName;
+  alb._folderRelPath = `${folderTag}/${destName}`;
+  return true;
+}
+async function setPrimaryFolderCategoryTag(alb, folderTag){
+  folderTag=String(folderTag||'').trim();
+  if(!isStandardSecondLevelFolderTag(folderTag)) return false;
+  const existingPrimary = getPrimaryFolderCategoryTag(alb);
+  if(existingPrimary===folderTag) return false;
+  const currentCategory=(alb._folderRelPath||'').split('/').filter(Boolean)[0]||'';
+  const nextTags=(alb.tags||[]).filter(t=>!isStandardSecondLevelFolderTag(t)).filter(t=>{
+    if(!t.includes('/')) return !preferredFolderCategoryOrder.includes(t);
+    return !STANDARD_SECOND_LEVEL_FOLDERS.some(ft=>t===`${parseFolderCategoryName(ft)?.parent}/${ft}`);
+  });
+  const canonicalTags=buildCanonicalFolderCategoryTags(folderTag);
+  canonicalTags.filter(tag=>tag!==folderTag).forEach(tag=>{ if(!nextTags.includes(tag)) nextTags.push(tag); });
+  if(!nextTags.includes(folderTag)) nextTags.push(folderTag);
+  alb.tags=nextTags;
+  let moved=false;
+  if(currentCategory==='未分类') moved=await moveAlbumFolderToCategory(alb, folderTag);
+  else if(existingPrimary) moved=await moveAlbumFolderToCategory(alb, folderTag);
+  store.setAlbum(alb.name,{tags:alb.tags});
+  scheduleWrite(alb);
+  if(moved){
+    const fromLabel = currentCategory || '未分类';
+    const moveMsg = `📁 已從 ${fromLabel} 移動到 ${folderTag}`;
+    toast(moveMsg, 2200);
+  }
+  return true;
 }
 function getFolderCategoryTagSets(){
   const parentTags=new Set(), childTags=new Set(), rawTags=new Set();
@@ -2429,10 +2556,147 @@ async function readPhotosFromDir(dir){
 
   return {photos,postMeta,firstImage,notesData,_corruptMeta};
 }
+function createAlbumIndexRecord(patch){
+  return {
+    coverUrl:null,
+    _inheritTags:[],
+    ...patch,
+  };
+}
+const ROOT_INDEX_FILE='.local-ig-index.json';
+function buildRootIndexSnapshot(root, albumRecords){
+  return {
+    version: 1,
+    rootName: root.name,
+    rootAbsPath: S.rootAbsPath || null,
+    defaultFolderCategories: [...(S.defaultFolderCategories||[])],
+    albumRecords: albumRecords.map(rec=>(
+      {
+        name: rec.name,
+        folderRelPath: rec._folderRelPath || null,
+        inheritTags: [...(rec._inheritTags||[])],
+        rootAlbum: !!rec.rootAlbum,
+        looseSingle: !!rec._looseSingle,
+        photoCount: rec.photos?.length || 0,
+        firstPhotoName: rec.photos?.[0]?.name || null,
+        shortcode: rec.postMeta?.shortcode || null,
+        titleHint: rec.postMeta?.caption ? firstLine(rec.postMeta.caption,36) : null,
+      }
+    )),
+  };
+}
+async function readRootIndexSnapshot(root){
+  try{
+    const fh=await root.getFileHandle(ROOT_INDEX_FILE);
+    return JSON.parse(await (await fh.getFile()).text());
+  }catch{return null;}
+}
+function applyRootIndexSnapshotToState(snapshot){
+  if(!snapshot) return;
+  if(Array.isArray(snapshot.defaultFolderCategories))
+    S.defaultFolderCategories=[...snapshot.defaultFolderCategories];
+  if(typeof snapshot.rootAbsPath==='string' && snapshot.rootAbsPath.trim())
+    S.rootAbsPath=snapshot.rootAbsPath.trim();
+}
+async function writeRootIndexSnapshot(root, snapshot){
+  try{
+    const fh=await root.getFileHandle(ROOT_INDEX_FILE,{create:true});
+    const w=await fh.createWritable();
+    await w.write(JSON.stringify(snapshot,null,2));
+    await w.close();
+  }catch{}
+}
+async function materializeAlbumsFromIndexRecords(albumRecords, rootName){
+  const albums=albumRecords.map(rec=>({...rec}));
+  for(const alb of albums){
+    const nd =alb.notesData;
+    const meta=store.getAlbum(alb.name);
+    const pm =alb.postMeta;
+
+    if(pm?.date!=null && pm.date!=='' && pm.date!==0){
+      const d=new Date(pm.date);
+      alb.photos.forEach(p=>p.date=isNaN(d)?new Date(p.file.lastModified):d);
+    } else {
+      for(const p of alb.photos) p.date=await getPhotoDate(p.file);
+      alb.photos.sort((a,b)=>a.date-b.date);
+    }
+
+    const pinnedName=alb.notesData?.coverPhoto;
+    const coverSrc=
+      (pinnedName&&alb.photos.find(p=>p.name===pinnedName))
+      ||alb.firstImage
+      ||(alb.photos.find(p=>!p.isVideo))
+      ||alb.photos[0];
+    if(coverSrc) alb.coverUrl=URL.createObjectURL(coverSrc.file);
+
+    const fallbackTitle=alb._looseSingle
+      ? alb.photos[0]?.name.replace(/\.\w+$/,'')
+      : (alb.rootAlbum?rootName:alb.name);
+    alb.title = nd?.title || meta.title || (pm ? firstLine(pm.caption,36) : null) || fallbackTitle;
+
+    alb.desc = nd?.desc!==undefined ? nd.desc : (meta.desc!==undefined ? meta.desc : (pm?.caption||''));
+    const _locNd   = nd?.location;
+    const _locMeta = meta.location;
+    const _locPm   = pm?.location;
+    const rawLoc = (_locNd   != null && _locNd   !== '') ? _locNd
+                 : (_locMeta != null && _locMeta !== '') ? _locMeta
+                 : _locPm;
+    alb.location = typeof rawLoc==='object' && rawLoc!==null
+      ? (rawLoc.name||rawLoc.city||rawLoc.address||'')
+      : (rawLoc||'');
+    alb.igUrl    = pm?.ig_url || '';
+    alb.likes    = pm?.likes ?? null;
+    alb.source   = pm?.source || (pm?.ig_url ? 'ig' : '');
+    alb.fromIG   = alb.source === 'ig' || (!pm?.source && !!(pm?.ig_url));
+    alb.fromXHS  = alb.source === 'xhs';
+
+    const _rawInh=alb._inheritTags||[];
+    let inheritTags;
+    const folderNameTags=buildFolderNameDefaultTags(_rawInh);
+    if(_rawInh.length===0){
+      inheritTags=[];
+    } else {
+      const fn1=_rawInh[0].toLowerCase();
+      const group=getEffectiveHierarchy().find(g=>g.kw&&g.kw.some(kw=>fn1===kw.toLowerCase()));
+      const l1Tag=group?tagName(group.l1):_rawInh[0];
+      const folderChild=group?.children?.find(c=>c.kw&&c.kw.some(kw=>fn1===kw.toLowerCase()));
+      if(_rawInh.length===1){
+        inheritTags=folderChild ? [l1Tag, `${l1Tag}/${tagName(folderChild.l2)}`] : [l1Tag];
+      } else {
+        const l2Raw=_rawInh[1];
+        const child=group?.children?.find(c=>c.kw&&c.kw.some(kw=>l2Raw.toLowerCase()===kw.toLowerCase()));
+        const l2Tag=child?`${l1Tag}/${tagName(child.l2)}`:`${l1Tag}/${l2Raw}`;
+        inheritTags=[l1Tag,l2Tag];
+      }
+      inheritTags = mergeTagLists(inheritTags, folderNameTags);
+    }
+    const savedTags = nd?.tags ?? meta.tags ?? null;
+    alb._hasManualTags = savedTags !== null || inheritTags.length>0;
+    if(savedTags !== null){
+      alb.tags = mergeTagLists(inheritTags, savedTags.filter(t=>typeof t==='string'&&t.trim()).map(translateTag));
+    } else if(inheritTags.length){
+      alb.tags=[...inheritTags];
+    } else {
+      alb.tags = autoDetectTags(alb);
+    }
+  }
+  const scMap=new Map();
+  for(const alb of albums){
+    const sc=alb.postMeta?.shortcode;
+    if(sc){
+      if(!scMap.has(sc)) scMap.set(sc,[]);
+      scMap.get(sc).push(alb);
+    }
+  }
+  for(const [,group] of scMap){
+    if(group.length>1) group.forEach(a=>a._isDuplicate=true);
+  }
+  return albums;
+}
 
 // 将一个「散图文件夹」的直属图片收集成相册列表
 // mode: 'single'（每张独立）| 'merged'（整体一个相册）| 'auto'（按有无同名txt自动）
-async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'){
+async function readLooseDirAsAlbumIndexRecords(dirHandle, dirName, inheritTags, mode='auto'){
   const images=[], videos=[], txtMap={};
   for await(const [name,h] of dirHandle.entries()){
     if(h.kind!=='file') continue;
@@ -2454,7 +2718,6 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
   images.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   videos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
 
-  // 视频与封面配对
   const usedCovers=new Set();
   for(const v of videos){
     const base=v.name.replace(/\.\w+$/,'');
@@ -2463,14 +2726,12 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
   }
   const displayPhotos=[...images,...videos];
 
-  // 确定实际模式：auto 时按有无同名 txt 决定
   const allMedia=[...images,...videos];
   const hasPerFileTxt=allMedia.some(p=>getTxtCaptionForPhoto(txtMap,p.name)!==undefined);
   const useSingle = mode==='single' || (mode==='auto' && hasPerFileTxt);
 
+  const albumRecords = [];
   if(useSingle){
-    // 模式A：每张图 + 同名 txt = 一个独立相册
-    const albums=[];
     for(const photo of displayPhotos){
       const caption=getTxtCaptionForPhoto(txtMap, photo.name)||'';
       const albumName=`${dirName}/${photo.name}`;
@@ -2480,17 +2741,15 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
         date:null, location:'', shortcode:'', ig_url:'',
         is_video:photo.isVideo, image_count:1, source:'loose',
       };
-      albums.push({
+      albumRecords.push(createAlbumIndexRecord({
         name:albumName, handle:dirHandle,
-        photos:[photo], coverUrl:null, postMeta, firstImage:photo.isVideo?null:photo,
+        photos:[photo], postMeta, firstImage:photo.isVideo?null:photo,
         notesData, _inheritTags:inheritTags,
-        _looseSingle:true, // 标记为散图单张模式
-      });
+        _looseSingle:true,
+      }));
     }
-    return albums;
+    return albumRecords;
   } else {
-    // 模式B：整个文件夹作为一个相册
-    // 查找整体描述 txt（名字与文件夹同名，或只有一个 txt）
     let folderCaption='';
     const txtKeys=Object.keys(txtMap);
     if(txtMap[dirName]) folderCaption=txtMap[dirName].trim();
@@ -2502,16 +2761,17 @@ async function readLooseDirAsAlbums(dirHandle, dirName, inheritTags, mode='auto'
       caption:folderCaption, date:null, location:'', shortcode:'', ig_url:'',
       is_video:false, image_count:displayPhotos.length, source:'loose',
     }:null;
-    return [{
+    albumRecords.push(createAlbumIndexRecord({
       name:dirName, handle:dirHandle,
-      photos:displayPhotos, coverUrl:null, postMeta, firstImage,
+      photos:displayPhotos, postMeta, firstImage,
       notesData, _inheritTags:inheritTags,
-    }];
+    }));
+    return albumRecords;
   }
 }
 
 async function readFolder(root){
-  const albums=[];
+  const albumRecords=[];
   // 读取 _path.txt，并自动校对文件夹名（防止文件夹改名/移动后路径失效）
   S.rootAbsPath=null;
   try{
@@ -2576,7 +2836,7 @@ async function readFolder(root){
       if(kind==='post'){
         // 标准帖子文件夹（含媒体或 meta.json）
         const {photos,postMeta,firstImage,notesData,_corruptMeta}=await readPhotosFromDir(h);
-        if(photos.length) albums.push({name,handle:h,photos,coverUrl:null,postMeta,firstImage,notesData,_corruptMeta});
+        if(photos.length) albumRecords.push(createAlbumIndexRecord({name,handle:h,photos,postMeta,firstImage,notesData,_corruptMeta}));
       } else if(kind==='category'){
         // 分类文件夹：遍历子文件夹，外层名作为 L1 inheritTag
         // 若子文件夹本身也是 category（L2），再向下一层扫描帖子
@@ -2587,7 +2847,7 @@ async function readFolder(root){
               const subKind=await classifyDir(subH);
               if(subKind==='post'){
                 const {photos,postMeta,firstImage,notesData,_corruptMeta}=await readPhotosFromDir(subH);
-                if(photos.length) albums.push({name:subName,handle:subH,photos,coverUrl:null,postMeta,firstImage,notesData,_corruptMeta,_inheritTags:[name],_folderRelPath:`${name}/${subName}`});
+                if(photos.length) albumRecords.push(createAlbumIndexRecord({name:subName,handle:subH,photos,postMeta,firstImage,notesData,_corruptMeta,_inheritTags:[name],_folderRelPath:`${name}/${subName}`}));
               } else if(subKind==='category'){
                 // L2 分类文件夹：帖子继承 [L1, L2]
                 try{
@@ -2597,25 +2857,25 @@ async function readFolder(root){
                       const subSubKind=await classifyDir(subSubH);
                       if(subSubKind==='post'){
                         const {photos,postMeta,firstImage,notesData,_corruptMeta}=await readPhotosFromDir(subSubH);
-                        if(photos.length) albums.push({name:subSubName,handle:subSubH,photos,coverUrl:null,postMeta,firstImage,notesData,_corruptMeta,_inheritTags:[name,subName],_folderRelPath:`${name}/${subName}/${subSubName}`});
+                        if(photos.length) albumRecords.push(createAlbumIndexRecord({name:subSubName,handle:subSubH,photos,postMeta,firstImage,notesData,_corruptMeta,_inheritTags:[name,subName],_folderRelPath:`${name}/${subName}/${subSubName}`}));
                       }
                     }catch{}
                   }
                 }catch{}
               } else if(subKind!=='empty'){
                 // 散图子文件夹：自动按规则处理（有同名txt→每张独立，否则→合并）
-                const looseAlbums=await readLooseDirAsAlbums(subH,subName,[name],'auto');
-                looseAlbums.forEach(a=>a._folderRelPath=`${name}/${subName}`);
-                albums.push(...looseAlbums);
+                const looseAlbumRecords=await readLooseDirAsAlbumIndexRecords(subH,subName,[name],'auto');
+                looseAlbumRecords.forEach(a=>a._folderRelPath=`${name}/${subName}`);
+                albumRecords.push(...looseAlbumRecords);
               }
             }catch{}
           }
         }catch{}
         // 分类文件夹下直属的散图
         try{
-          const catAlbums=await readLooseDirAsAlbums(h,name,[name],'auto');
-          catAlbums.forEach(a=>a._folderRelPath=name);
-          albums.push(...catAlbums);
+          const catAlbumRecords=await readLooseDirAsAlbumIndexRecords(h,name,[name],'auto');
+          catAlbumRecords.forEach(a=>a._folderRelPath=name);
+          albumRecords.push(...catAlbumRecords);
         }catch{}
       }
     }catch{}
@@ -2641,102 +2901,12 @@ async function readFolder(root){
           rootNotesData.photos[p.name]=txtCaption;
       }
     }
-    albums.unshift({name:'__root__',handle:null,photos:rootPhotos,coverUrl:null,postMeta:null,rootAlbum:true,firstImage:rootLooseImgs[0]||null,notesData:rootNotesData});
+    albumRecords.unshift(createAlbumIndexRecord({name:'__root__',handle:null,photos:rootPhotos,postMeta:null,rootAlbum:true,firstImage:rootLooseImgs[0]||null,notesData:rootNotesData}));
   }
 
-  // 统一后处理：日期 / 封面 / 标题 / 文案 / 标签
-  for(const alb of albums){
-    const nd =alb.notesData;
-    const meta=store.getAlbum(alb.name);
-    const pm =alb.postMeta;
-
-    if(pm?.date!=null && pm.date!=='' && pm.date!==0){
-      const d=new Date(pm.date);
-      alb.photos.forEach(p=>p.date=isNaN(d)?new Date(p.file.lastModified):d);
-    } else {
-      for(const p of alb.photos) p.date=await getPhotoDate(p.file);
-      alb.photos.sort((a,b)=>a.date-b.date);
-    }
-
-    const pinnedName=alb.notesData?.coverPhoto;
-    const coverSrc=
-      (pinnedName&&alb.photos.find(p=>p.name===pinnedName))
-      ||alb.firstImage
-      ||(alb.photos.find(p=>!p.isVideo))
-      ||alb.photos[0];
-    if(coverSrc) alb.coverUrl=URL.createObjectURL(coverSrc.file);
-
-    // 标题：散图单张用文件名（去扩展名），其他用文件夹名
-    const fallbackTitle=alb._looseSingle
-      ? alb.photos[0]?.name.replace(/\.\w+$/,'')
-      : (alb.rootAlbum?root.name:alb.name);
-    alb.title = nd?.title || meta.title || (pm ? firstLine(pm.caption,36) : null) || fallbackTitle;
-
-    alb.desc = nd?.desc!==undefined ? nd.desc : (meta.desc!==undefined ? meta.desc : (pm?.caption||''));
-    // location 兼容多种格式：字符串 / {name:'...'} 对象 / null
-    // location 优先级：notes.json > localStorage缓存 > meta.json（postMeta）
-    // 空字符串视为"未设置"，不覆盖 meta.json 里从 IG 导入的真实地址
-    const _locNd   = nd?.location;
-    const _locMeta = meta.location;
-    const _locPm   = pm?.location;
-    const rawLoc = (_locNd   != null && _locNd   !== '') ? _locNd
-                 : (_locMeta != null && _locMeta !== '') ? _locMeta
-                 : _locPm;
-    alb.location = typeof rawLoc==='object' && rawLoc!==null
-      ? (rawLoc.name||rawLoc.city||rawLoc.address||'')
-      : (rawLoc||'');
-    alb.igUrl    = pm?.ig_url || '';
-    alb.likes    = pm?.likes ?? null;
-    alb.source   = pm?.source || (pm?.ig_url ? 'ig' : '');
-    alb.fromIG   = alb.source === 'ig' || (!pm?.source && !!(pm?.ig_url));
-    alb.fromXHS  = alb.source === 'xhs';
-
-    // 标签：继承的分类文件夹名映射到 TAG_HIERARCHY
-    // _inheritTags 长度 1 → [L1tag]
-    // _inheritTags 长度 2 → [L1tag, L1tag/L2name]
-    const _rawInh=alb._inheritTags||[];
-    let inheritTags;
-    const folderNameTags=buildFolderNameDefaultTags(_rawInh);
-    if(_rawInh.length===0){
-      inheritTags=[];
-    } else {
-      const fn1=_rawInh[0].toLowerCase();
-      const group=getEffectiveHierarchy().find(g=>g.kw&&g.kw.some(kw=>fn1===kw.toLowerCase()));
-      const l1Tag=group?tagName(group.l1):_rawInh[0];
-      const folderChild=group?.children?.find(c=>c.kw&&c.kw.some(kw=>fn1===kw.toLowerCase()));
-      if(_rawInh.length===1){
-        inheritTags=folderChild ? [l1Tag, `${l1Tag}/${tagName(folderChild.l2)}`] : [l1Tag];
-      } else {
-        // L2：尝试匹配 TAG_HIERARCHY children，否则保留原名
-        const l2Raw=_rawInh[1];
-        const child=group?.children?.find(c=>c.kw&&c.kw.some(kw=>l2Raw.toLowerCase()===kw.toLowerCase()));
-        const l2Tag=child?`${l1Tag}/${tagName(child.l2)}`:`${l1Tag}/${l2Raw}`;
-        inheritTags=[l1Tag,l2Tag];
-      }
-      inheritTags = mergeTagLists(inheritTags, folderNameTags);
-    }
-    const savedTags = nd?.tags ?? meta.tags ?? null;
-    alb._hasManualTags = savedTags !== null || inheritTags.length>0;
-    if(savedTags !== null){
-      alb.tags = mergeTagLists(inheritTags, savedTags.filter(t=>typeof t==='string'&&t.trim()).map(translateTag));
-    } else if(inheritTags.length){
-      alb.tags=[...inheritTags];
-    } else {
-      alb.tags = autoDetectTags(alb);
-    }
-  }
-  // 重複帖子偵測：相同 shortcode 標記 _isDuplicate
-  const scMap=new Map();
-  for(const alb of albums){
-    const sc=alb.postMeta?.shortcode;
-    if(sc){
-      if(!scMap.has(sc)) scMap.set(sc,[]);
-      scMap.get(sc).push(alb);
-    }
-  }
-  for(const [,group] of scMap){
-    if(group.length>1) group.forEach(a=>a._isDuplicate=true);
-  }
+  const snapshot = buildRootIndexSnapshot(root, albumRecords);
+  await writeRootIndexSnapshot(root, snapshot);
+  const albums = await materializeAlbumsFromIndexRecords(albumRecords, root.name);
   return albums;
 }
 
@@ -4421,7 +4591,13 @@ function renderTagEditor(alb, container){
     remaining.forEach(tag=>{
       const c=document.createElement('span');c.className='sugChip';
       c.textContent='+ '+tag;
-      c.addEventListener('click',()=>{ if(addTag(alb,tag)){rebuildArea();refreshSug();} });
+      c.addEventListener('click',async()=>{
+        if(isStandardSecondLevelFolderTag(tag)){
+          if(await setPrimaryFolderCategoryTag(alb,tag)){rebuildArea();refreshSug();refreshCurrentAlbumView(alb);}
+        }else if(addTag(alb,tag)){
+          rebuildArea();refreshSug();
+        }
+      });
       sugRow.appendChild(c);
     });
     sugRow.style.display=remaining.length?'':'none';
@@ -4430,7 +4606,8 @@ function renderTagEditor(alb, container){
   function rebuildArea(){
     area.innerHTML='';
     (alb.tags||[]).forEach(tag=>{
-      const chip=document.createElement('span');chip.className='tagChip';
+      const chip=document.createElement('span');
+      chip.className='tagChip'+(isStandardSecondLevelFolderTag(tag) ? ' folderTagChip' : ' normalTagChip');
       const x=document.createElement('button');x.className='tagX';x.textContent='×';
       x.addEventListener('click',()=>{
         if(tag.includes('/')){
@@ -4509,27 +4686,30 @@ function renderTagEditor(alb, container){
   l1Inp.addEventListener('input',fillL2);
   l1Inp.addEventListener('change',fillL2);
 
-  const doAdd=()=>{
+  const doAdd=async()=>{
     const l1v=l1Inp.value.trim();
     if(!l1v) return;
     const l2v=l2Inp.value.trim();
+    const folderCandidate = l2v || l1v;
     let changed=false;
-    if(addTag(alb,l1v)) changed=true;
-    if(l2v&&addTag(alb,`${l1v}/${l2v}`)) changed=true;
+    if(isStandardSecondLevelFolderTag(folderCandidate)){
+      if(await setPrimaryFolderCategoryTag(alb, folderCandidate)) changed=true;
+    } else if(addTag(alb,l1v)) changed=true;
+    if(l2v && !isStandardSecondLevelFolderTag(folderCandidate) && addTag(alb,`${l1v}/${l2v}`)) changed=true;
     if(changed){
       l1Inp.value='';l2Inp.value='';l2Inp.disabled=true;
-      rebuildArea();refreshSug();
+      rebuildArea();refreshSug();refreshCurrentAlbumView(alb);
     }
   };
 
   // Enter 在 L1：若 L2 可用則跳到 L2，否則直接提交
   l1Inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();l2Inp.disabled?doAdd():l2Inp.focus();}
+    if(e.key==='Enter'){e.preventDefault();l2Inp.disabled?void doAdd():l2Inp.focus();}
   });
   l2Inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();doAdd();}
+    if(e.key==='Enter'){e.preventDefault();void doAdd();}
   });
-  addBtn.addEventListener('click',doAdd);
+  addBtn.addEventListener('click',()=>void doAdd());
 
   fillL1();
   addRow.append(dl1,dl2,l1Inp,sep,l2Inp,addBtn);
@@ -4789,6 +4969,22 @@ function showLooseDialog(pending){
   });
 }
 
+async function ensureStandardSecondLevelFolders(root){
+  if(!root?.getDirectoryHandle) return;
+  for(const name of STANDARD_SECOND_LEVEL_FOLDERS){
+    try{ await root.getDirectoryHandle(name,{create:true}); }catch{}
+  }
+}
+function refreshCurrentAlbumView(alb){
+  if(S.view==='home') renderHome();
+  else if(S.view==='album'&&S.currentAlbum&&S.currentAlbum===alb){
+    if(S.albumMode==='grid') renderAlbumGrid(alb);
+    else renderAlbum(alb);
+  } else if(S.view==='lb'&&S.currentAlbum&&S.currentAlbum===alb){
+    renderLB();
+  }
+}
+
 // ── Load folder (shared by openFolder + restore) ─────────────────────────
 async function doLoadFolder(h){
   S.rootDirHandle=h;
@@ -4798,6 +4994,10 @@ async function doLoadFolder(h){
   btnOpen.style.display='none';$('btnRefresh').style.display='none';$('btnTranslate').style.display='none';$('btnBackup').style.display='none';$('btnAddPosts').style.display='none';$('hdr').style.display='';
   try{
     S.rootName=h.name;
+    S.rootIndexSnapshot=await readRootIndexSnapshot(h);
+    S.rootIndexSnapshotLoadedAt=Date.now();
+    applyRootIndexSnapshotToState(S.rootIndexSnapshot);
+    await ensureStandardSecondLevelFolders(h);
     idb.set('lastFolder',h).catch(()=>{});
     S.albums=await readFolder(h);
     recoverNotesFromMemory();
@@ -6575,3 +6775,9 @@ $('batchDelete').addEventListener('click',()=>{
 </script>
 </body>
 </html>
+
+
+
+
+
+

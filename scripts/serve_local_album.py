@@ -4,6 +4,9 @@ import json
 import os
 import socket
 import subprocess
+import sys
+import urllib.error
+import urllib.request
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -13,9 +16,88 @@ from typing import Any
 DEFAULT_PORT = int(os.environ.get('LOCAL_IG_PORT', '8765'))
 DEFAULT_PORT_ATTEMPTS = int(os.environ.get('LOCAL_IG_PORT_ATTEMPTS', '100'))
 HOST = os.environ.get('LOCAL_IG_HOST', '127.0.0.1')
-ROOT = Path(__file__).resolve().parents[1]
+LOCAL_IG_BOOTSTRAP_DIR = os.environ.get('LOCAL_IG_BOOTSTRAP_DIR', '本地IG')
+LOCAL_IG_ROLE_DIRS = ['角色1', '角色2']
+LOCAL_IG_OPENER_EXE_NAME = os.environ.get('LOCAL_IG_OPENER_EXE_NAME', '打开本地IG.exe')
+STANDARD_SECOND_LEVEL_FOLDERS = [
+    '人-合照', '人-摆拍', '人-自拍',
+    '住-家', '住-旅店',
+    '吃喝', '吃喝-下午茶', '吃喝-办公室', '吃喝-午', '吃喝-宵夜', '吃喝-家', '吃喝-早', '吃喝-早午', '吃喝-晚',
+    '备忘-IG', '备忘-客户',
+    '工作-出差', '工作-办公室', '工作-饭局',
+    '未分类',
+    '玩乐', '玩乐-山林', '玩乐-市区', '玩乐-海边',
+    '行-出海', '行-地铁', '行-自驾', '行-航班',
+]
+
+
+def has_required_assets(base: Path) -> bool:
+    return (base / 'local-ig.html').exists()
+
+
+def resolve_launch_dir() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
+
+
+def ensure_bootstrap_local_ig(base: Path) -> tuple[Path, list[Path]]:
+    root = base / LOCAL_IG_BOOTSTRAP_DIR
+    root.mkdir(parents=True, exist_ok=True)
+
+    created_roles: list[Path] = []
+    for role in LOCAL_IG_ROLE_DIRS:
+        role_dir = root / role
+        role_dir.mkdir(parents=True, exist_ok=True)
+        for name in STANDARD_SECOND_LEVEL_FOLDERS:
+            (role_dir / name).mkdir(parents=True, exist_ok=True)
+        created_roles.append(role_dir)
+
+    # Keep a copy of launcher in 本地IG for one-folder usage.
+    try:
+        if getattr(sys, 'frozen', False):
+            src_exe = Path(sys.executable).resolve()
+            dst_exe = root / LOCAL_IG_OPENER_EXE_NAME
+            if not dst_exe.exists():
+                dst_exe.write_bytes(src_exe.read_bytes())
+    except Exception:
+        pass
+
+    return root, created_roles
+
+
+def resolve_root() -> Path:
+    env_root = os.environ.get('LOCAL_IG_ROOT', '').strip()
+    if env_root:
+        p = Path(env_root).expanduser()
+        if p.exists() and has_required_assets(p):
+            return p
+
+    candidates: list[Path] = []
+
+    # In a frozen one-file exe, try bundled extraction dir first.
+    if getattr(sys, 'frozen', False):
+        mei = getattr(sys, '_MEIPASS', None)
+        if mei:
+            candidates.append(Path(mei).resolve())
+        candidates.append(Path(sys.executable).resolve().parent)
+
+    candidates.append(Path(__file__).resolve().parents[1])
+    candidates.append(Path.cwd().resolve())
+
+    for candidate in candidates:
+        if has_required_assets(candidate):
+            return candidate
+
+    # Last fallback to keep behavior predictable, even when assets are missing.
+    return candidates[0]
+
+
+ROOT = resolve_root()
 STATUS_FILE = os.environ.get('LOCAL_IG_STATUS_FILE', '').strip()
 NO_BROWSER = os.environ.get('LOCAL_IG_NO_BROWSER', '').strip() == '1'
+INSTANCE_LOCK_PORT = int(os.environ.get('LOCAL_IG_INSTANCE_LOCK_PORT', '38765'))
+INSTANCE_LOCK_SOCKET: socket.socket | None = None
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -61,12 +143,50 @@ def write_status(state: str, **extra: Any) -> None:
 
 def is_port_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind((host, port))
         except OSError:
             return False
     return True
+
+
+def acquire_instance_lock() -> bool:
+    """Prevent duplicate launches by binding a dedicated local lock port."""
+    global INSTANCE_LOCK_SOCKET
+    lock_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        lock_sock.bind((HOST, INSTANCE_LOCK_PORT))
+        lock_sock.listen(1)
+    except OSError:
+        try:
+            lock_sock.close()
+        except Exception:
+            pass
+        return False
+    INSTANCE_LOCK_SOCKET = lock_sock
+    return True
+
+
+def open_existing_server_page() -> bool:
+    url = make_url(DEFAULT_PORT)
+    if not is_server_healthy(url):
+        return False
+    try:
+        webbrowser.open(url)
+        return True
+    except Exception:
+        return False
+
+
+def is_server_healthy(url: str) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as resp:
+            if resp.status != 200:
+                return False
+            content = resp.read(4096).decode('utf-8', errors='ignore')
+            return 'btnWelcomeOpen' in content or '<!DOCTYPE html' in content
+    except (OSError, urllib.error.URLError, TimeoutError):
+        return False
 
 
 def find_available_port(start_port: int, attempts: int = 30) -> int:
@@ -93,6 +213,23 @@ def open_folder_in_explorer(path: str) -> dict[str, Any]:
 
 
 def main() -> int:
+    launch_dir = resolve_launch_dir()
+    # If launched from inside "本地IG", do not generate another nested template.
+    if launch_dir.name != LOCAL_IG_BOOTSTRAP_DIR:
+        try:
+            bootstrap_root, role_dirs = ensure_bootstrap_local_ig(launch_dir)
+            print(f'[信息] 已确保目录模板: {bootstrap_root}')
+            for role_dir in role_dirs:
+                print(f'[信息] 已确保角色目录: {role_dir}')
+        except Exception as exc:
+            print(f'[警告] 创建模板目录失败: {exc}')
+
+    if not acquire_instance_lock():
+        print('[信息] 检测到实例锁已存在，尝试复用已运行页面。')
+        if open_existing_server_page():
+            return 0
+        print('[警告] 发现旧实例但页面不可用，将尝试启动新实例。')
+
     handler = partial(QuietHandler, directory=str(ROOT))
 
     try:

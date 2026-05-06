@@ -27,6 +27,22 @@
 python scripts/serve_local_album.py
 ```
 
+## 打包成单文件 EXE（用于 GitHub 发布）
+在项目根目录执行：
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1
+```
+
+或直接双击：
+- `构建发布包.bat`
+
+构建完成后可在 `release/` 下得到：
+- `LocalAlbum.exe`
+- `README_快速开始.txt`
+- `SHA256.txt`
+- `LocalAlbum-<VERSION>-win64.zip`
+
 ## 为什么不要直接双击 HTML？
 因为浏览器在 `file://` 模式下会限制文件夹访问 API。
 
