@@ -5263,6 +5263,11 @@ function buildIgAuthArgs(sidRaw){
   if(sid) return ` --sessionid ${quoteArg(sid)}`;
   return ' --cookies-from-browser chrome';
 }
+function looksLikePlaceholderSid(sid){
+  const s=sanitizeSessionId(sid).toLowerCase();
+  if(!s) return false;
+  return s.includes('your') || s.includes('sessionid') || s.includes('这里') || s.includes('你的');
+}
 
 // Chip selection
 document.querySelectorAll('#igCountChips .igRangePreset').forEach(btn=>{
@@ -5287,12 +5292,14 @@ $('igFetchBtn').addEventListener('click',async()=>{
   const effectiveOutput=output||(dir?`${dir}/downloads`:'downloads');
   const sid=($('igSessionId')?.value||'');
   const scriptPath=await resolveIgScriptPath();
-  $('igCmd1').value='pip install --upgrade instaloader requests browser-cookie3';
+  $('igCmd1').value=`pip install --upgrade instaloader requests browser-cookie3\npython ${quoteArg(scriptPath)} --doctor`;
   $('igCmd2').value=`python ${quoteArg(scriptPath)} ${username}${count?' --count '+count:''} --output ${quoteArg(effectiveOutput)}${buildIgAuthArgs(sid)}`;
   const s2note=$('igStep2Note');
   if(s2note){
     const sidClean=sanitizeSessionId(sid);
-    if(!sidClean){
+    if(looksLikePlaceholderSid(sidClean)){
+      s2note.textContent='（你填写的是占位文字，不是真实 Session ID；请替换后再执行）';
+    }else if(!sidClean){
       s2note.textContent='（未填 Session ID：已自动改为 --cookies-from-browser chrome）';
     }else if(scriptPath==='ig_download.py'){
       s2note.textContent='（请在命令执行目录放置 ig_download.py，或把脚本改成绝对路径）';

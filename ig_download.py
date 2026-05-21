@@ -266,7 +266,23 @@ def main():
         help='下载根目录（默认: 脚本所在目录/downloads）')
     parser.add_argument('--delay', type=float, default=2.0, metavar='SEC',
         help='帖子间隔秒数，降低限流概率（默认: 2.0）')
+    parser.add_argument('--doctor', action='store_true',
+        help='打印脚本自检信息（版本、路径、是否支持 --sessionid）后退出')
     args = parser.parse_args()
+
+    if args.doctor:
+        version = 'unknown'
+        try:
+            version = (Path(__file__).resolve().parent / 'VERSION').read_text(encoding='utf-8').strip()
+        except Exception:
+            pass
+        print('IG Downloader Doctor')
+        print(f'  script_path: {Path(__file__).resolve()}')
+        print(f'  version: {version}')
+        print('  supports_sessionid: yes')
+        print('  supports_cookies_from_browser: yes')
+        print('  tip: if you do not see these lines, you are likely running an old script')
+        sys.exit(0)
 
     # --fix-path 模式：只更新 _path.txt，不下载
     if args.fix_path is not None:

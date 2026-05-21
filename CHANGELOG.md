@@ -32,6 +32,15 @@
 - 優化：`sessionid` 為空時直接報錯並退出，避免繼續發送無效請求
 - 優化：新增 Instagram `403 Forbidden` 的專用錯誤指引，明確建議 `--cookies-from-browser` / `--sessionid` / `--login` 的優先順序
 
+## v0.4.2 - 2026-05-22
+
+### ig_download.py
+- 新增：`--doctor` 自檢參數，輸出腳本路徑、版本、功能支持（含 `--sessionid`），便於快速辨識是否跑到舊腳本
+
+### local-ig.html
+- 優化：IG 導入第 1 步命令新增 `python <script> --doctor`，先驗證腳本版本再下載
+- 優化：當 Session ID 看起來是占位文字（如「你的新sessionid」）時，直接顯示明確警告
+
 ## 2026-04-20
 
 ### local-ig.html
