@@ -31,6 +31,7 @@ import argparse
 import shutil
 from itertools import islice
 from pathlib import Path
+from urllib.parse import unquote
 
 RATE_LIMIT_WAIT    = 300  # 被限流后首次等待秒数（5 分钟）
 RATE_LIMIT_RETRIES = 5    # 最多重试次数
@@ -230,6 +231,12 @@ def _apply_ig_auth(L, sessionid: str):
     })
 
 
+def _clean_sessionid(raw: str) -> str:
+    """清洗用户粘贴的 sessionid，兼容引号与 URL 编码。"""
+    sid = (raw or '').strip().strip('"').strip("'")
+    return unquote(sid)
+
+
 # ── 主函数 ────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(
@@ -344,8 +351,10 @@ def main():
     # 直接传入 sessionid
     if args.sessionid:
         print(f"🔑  使用手动 sessionid…")
-        from urllib.parse import unquote
-        sid = unquote(args.sessionid)
+        sid = _clean_sessionid(args.sessionid)
+        if not sid:
+            print("❌  sessionid 为空，请重新复制后重试")
+            sys.exit(1)
         _apply_ig_auth(L, sid)
         # 抓取已登入用户名，让 instaloader 使用已登入 API endpoint
         uid = sid.split(':')[0]  # sessionid 首段即 user_id
@@ -416,7 +425,12 @@ def main():
     except Exception as e:
         msg = str(e)
         print(f"❌  获取失败: {msg}")
-        if '401' in msg or 'Unauthorized' in msg or 'wait a few minutes' in msg:
+        if '403' in msg or 'Forbidden' in msg:
+            print(f"\n  💡 Instagram 拒绝了匿名 GraphQL 请求（403）")
+            print(f"     建议优先使用：--cookies-from-browser chrome")
+            print(f"     其次使用：--sessionid <从 DevTools 复制的值>")
+            print(f"     或最後再試：--login")
+        elif '401' in msg or 'Unauthorized' in msg or 'wait a few minutes' in msg:
             print(f"\n  💡 Instagram 要求登录验证，请在命令末尾加上 --login 参数后重试")
         sys.exit(1)
 

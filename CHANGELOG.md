@@ -19,6 +19,19 @@
 - 新增：`tests/test_root_path_behavior.py`
 - 新增：`tests/test_versioning_convention.py`
 
+## v0.4.1 - 2026-05-21
+
+### local-ig.html
+- 修復：IG 導入命令中的 `--sessionid` 現在會自動加引號，避免特殊字元造成命令解析錯誤
+- 優化：未填 `Session ID` 時，生成命令自動改用 `--cookies-from-browser chrome`，降低 `--login` 失敗與 403 風險
+- 優化：`pip` 安裝命令新增 `browser-cookie3`，與新默認導入方式一致
+- 優化：導入命令生成時會檢查 `ig_download.py` 是否可訪問；若可能缺失，會給出更明確提示，避免誤以為腳本可直接執行
+
+### ig_download.py
+- 優化：新增 `sessionid` 清洗流程，自動去除首尾引號並解碼 URL 編碼值
+- 優化：`sessionid` 為空時直接報錯並退出，避免繼續發送無效請求
+- 優化：新增 Instagram `403 Forbidden` 的專用錯誤指引，明確建議 `--cookies-from-browser` / `--sessionid` / `--login` 的優先順序
+
 ## 2026-04-20
 
 ### local-ig.html

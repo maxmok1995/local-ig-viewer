@@ -5232,6 +5232,37 @@ function getIgScriptPath(){
   const dir=getHtmlDir();
   return dir?`${dir}/ig_download.py`:'ig_download.py';
 }
+function quoteArg(s){
+  return `"${String(s).replace(/"/g,'\\"')}"`;
+}
+function sanitizeSessionId(sid){
+  return (sid||'').trim().replace(/^['"]|['"]$/g,'');
+}
+async function detectScriptExists(path){
+  try{
+    const res=await fetch(path,{method:'HEAD',cache:'no-store'});
+    return !!res.ok;
+  }catch(e){
+    return false;
+  }
+}
+let __igScriptPathCache=null;
+async function resolveIgScriptPath(){
+  if(__igScriptPathCache) return __igScriptPathCache;
+  const p=getIgScriptPath();
+  if(await detectScriptExists(p)){__igScriptPathCache=p;return p;}
+  if(p!=='ig_download.py'&&await detectScriptExists('ig_download.py')){
+    __igScriptPathCache='ig_download.py';
+    return __igScriptPathCache;
+  }
+  __igScriptPathCache=p;
+  return __igScriptPathCache;
+}
+function buildIgAuthArgs(sidRaw){
+  const sid=sanitizeSessionId(sidRaw);
+  if(sid) return ` --sessionid ${quoteArg(sid)}`;
+  return ' --cookies-from-browser chrome';
+}
 
 // Chip selection
 document.querySelectorAll('#igCountChips .igRangePreset').forEach(btn=>{
@@ -5245,7 +5276,7 @@ $('igCountCustom').addEventListener('input',()=>{
   document.querySelectorAll('#igCountChips .igRangePreset').forEach(b=>b.classList.remove('active'));
 });
 
-$('igFetchBtn').addEventListener('click',()=>{
+$('igFetchBtn').addEventListener('click',async()=>{
   const username=$('igInput').value.trim().replace(/^@/,'');
   if(!username){$('igInput').focus();return;}
   const activeChip=document.querySelector('#igCountChips .igRangePreset.active');
@@ -5254,11 +5285,21 @@ $('igFetchBtn').addEventListener('click',()=>{
   const output=$('igOutput').value.trim().replace(/[/\\]+$/,'');
   const dir=getHtmlDir();
   const effectiveOutput=output||(dir?`${dir}/downloads`:'downloads');
-  const sid=($('igSessionId')?.value||'').trim();
-  $('igCmd1').value='pip install --upgrade instaloader requests';
-  $('igCmd2').value=`python "${getIgScriptPath()}" ${username}${count?' --count '+count:''} --output "${effectiveOutput}"${sid?' --sessionid '+sid:''}`;
+  const sid=($('igSessionId')?.value||'');
+  const scriptPath=await resolveIgScriptPath();
+  $('igCmd1').value='pip install --upgrade instaloader requests browser-cookie3';
+  $('igCmd2').value=`python ${quoteArg(scriptPath)} ${username}${count?' --count '+count:''} --output ${quoteArg(effectiveOutput)}${buildIgAuthArgs(sid)}`;
   const s2note=$('igStep2Note');
-  if(s2note) s2note.textContent=sid?'':'（建议填写 Session ID 以避免登录限制）';
+  if(s2note){
+    const sidClean=sanitizeSessionId(sid);
+    if(!sidClean){
+      s2note.textContent='（未填 Session ID：已自动改为 --cookies-from-browser chrome）';
+    }else if(scriptPath==='ig_download.py'){
+      s2note.textContent='（请在命令执行目录放置 ig_download.py，或把脚本改成绝对路径）';
+    }else{
+      s2note.textContent='';
+    }
+  }
   updateIgStep3Note(username);
   ['igStep1','igStep2','igStep3'].forEach(id=>$(id).classList.add('on'));
   [$('igCmd1'),$('igCmd2')].forEach(ta=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';});
@@ -5350,8 +5391,8 @@ $('igSessionId').addEventListener('input',()=>{
     const chip=document.querySelector('#quickIGChips .igRangePreset.active');
     const n=chip?chip.dataset.n:'';
     const outPath=S.rootAbsPath||'downloads';
-    const sid=($('igSessionId')?.value||'').trim();
-    return `python "${getIgScriptPath()}" ${user}${n?' --count '+n:''} --output "${outPath}"${sid?' --sessionid '+sid:''}`;
+    const sid=($('igSessionId')?.value||'');
+    return `python ${quoteArg(getIgScriptPath())} ${user}${n?' --count '+n:''} --output ${quoteArg(outPath)}${buildIgAuthArgs(sid)}`;
   }
 
   function refreshPanel(){
@@ -5474,8 +5515,8 @@ lbCaption.addEventListener('input',()=>{
       const user=$('igAddUser').value.trim().replace(/^@/,'');
       if(!user) return '';
       const n=getCount();
-      const sid=(localStorage.getItem('ig-session-id')||'').trim();
-      return `python "${getScriptPath('ig_download.py')}" ${user}${n?' --count '+n:''} --output "${getOutPath()}"${sid?' --sessionid '+sid:''}`;
+      const sid=(localStorage.getItem('ig-session-id')||'');
+      return `python ${quoteArg(getScriptPath('ig_download.py'))} ${user}${n?' --count '+n:''} --output ${quoteArg(getOutPath())}${buildIgAuthArgs(sid)}`;
     }
     if(platform==='xhs'){
       const user=$('igAddXhsUser').value.trim();
