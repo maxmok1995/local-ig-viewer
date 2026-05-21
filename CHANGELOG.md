@@ -41,6 +41,14 @@
 - 優化：IG 導入第 1 步命令新增 `python <script> --doctor`，先驗證腳本版本再下載
 - 優化：當 Session ID 看起來是占位文字（如「你的新sessionid」）時，直接顯示明確警告
 
+## v0.4.3 - 2026-05-22
+
+### ig_download.py
+- 修復：`profile.mediacount` 在部分會話下觸發 `graphql/query 400 invalid request` 時，不再直接崩潰
+- 優化：總數讀取失敗時切換降級模式，允許在 `--count N` 條件下繼續下載
+- 優化：`--check` 在無法讀取總數時改為明確提示（返回可理解錯誤）而非 traceback
+- 優化：當總數不可用時，阻止 `--start/--end` 並給出可執行替代方案
+
 ## 2026-04-20
 
 ### local-ig.html

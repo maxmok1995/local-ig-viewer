@@ -450,9 +450,18 @@ def main():
             print(f"\n  💡 Instagram 要求登录验证，请在命令末尾加上 --login 参数后重试")
         sys.exit(1)
 
-    total = profile.mediacount
+    total = None
+    try:
+        total = profile.mediacount
+    except Exception as e:
+        print(f"⚠️  无法读取帖子总数（mediacount）：{e}")
+        print("    将切换为降级模式继续下载（建议同时提供 --count）")
 
     if args.check:
+        if total is None:
+            print("\n  ⚠️  当前会话无法查询总数（GraphQL 受限）")
+            print("  → 请改用 --count N 直接下载最新 N 条\n")
+            sys.exit(2)
         print(f"\n  ✓  @{profile.username}  共 {total} 条帖子")
         print(f"\n  → 请将 {total} 填入页面的帖数输入框，选择下载范围\n")
         sys.exit(0)
@@ -460,15 +469,29 @@ def main():
     session = requests.Session()
 
     if args.start is not None or args.end is not None:
+        if total is None:
+            print("❌  当前会话无法读取总数，暂不支持 --start/--end 范围模式")
+            print("    请改用 --count N，或切换登录方式后重试")
+            sys.exit(1)
         start = max(1, args.start or 1)
         end   = min(args.end or total, total)
         limit = max(0, end - start + 1)
         posts_iter = islice(profile.get_posts(), start - 1, end)
         print(f"✓  @{profile.username}  {total} 条帖子，准备下载第 {start}–{end} 条（共 {limit} 条）\n")
     else:
-        limit = min(args.count, total) if args.count else total
-        posts_iter = islice(profile.get_posts(), limit)
-        print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
+        if args.count:
+            limit = min(args.count, total) if total is not None else args.count
+            posts_iter = islice(profile.get_posts(), limit)
+            total_label = f"{total} 条帖子，" if total is not None else ""
+            print(f"✓  @{profile.username}  {total_label}准备下载最新 {limit} 条\n")
+        else:
+            if total is None:
+                print("❌  当前会话无法读取总数，且未提供 --count")
+                print("    请改用: --count N（例如 --count 200）")
+                sys.exit(1)
+            limit = total
+            posts_iter = islice(profile.get_posts(), limit)
+            print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
     done = skip = fail = 0
     i = 0
 
@@ -511,7 +534,8 @@ def main():
         filled = int(bar_w * i / limit) if limit else 0
         bar = '█' * filled + '░' * (bar_w - filled)
         loc_str = ''
-        print(f"\n[{i}/{limit}] {bar} {pct}%  {post.date_local.strftime('%Y-%m-%d')}  /p/{post.shortcode}{loc_str}")
+        total_mark = str(limit) if limit else '?'
+        print(f"\n[{i}/{total_mark}] {bar} {pct}%  {post.date_local.strftime('%Y-%m-%d')}  /p/{post.shortcode}{loc_str}")
         try:
             result = process_post(post, profile_dir, session, args.delay)
             if result == 'ok':
