@@ -5,6 +5,7 @@ import os
 import socket
 import subprocess
 import sys
+import shutil
 import urllib.error
 import urllib.request
 import webbrowser
@@ -113,15 +114,18 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path != '/__open_folder__':
+        if self.path not in ('/__open_folder__', '/__run_ig_download__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
             length = int(self.headers.get('Content-Length', '0'))
             raw = self.rfile.read(length).decode('utf-8') if length else '{}'
             data = json.loads(raw)
-            path = str(data.get('path') or '').strip()
-            result = open_folder_in_explorer(path)
+            if self.path == '/__open_folder__':
+                path = str(data.get('path') or '').strip()
+                result = open_folder_in_explorer(path)
+            else:
+                result = run_ig_download(data)
             self._send_json(result, status=200 if result.get('ok') else 400)
         except Exception as exc:
             self._send_json({'ok': False, 'error': str(exc)}, status=500)
@@ -210,6 +214,73 @@ def open_folder_in_explorer(path: str) -> dict[str, Any]:
         return {'ok': True, 'path': str(target)}
     except Exception as exc:
         return {'ok': False, 'error': str(exc), 'path': str(target)}
+
+
+def _resolve_python_cmd() -> list[str] | None:
+    # Frozen launcher exe is not Python interpreter; prefer system python.
+    py = shutil.which('python')
+    if py:
+        return [py]
+    py_launcher = shutil.which('py')
+    if py_launcher:
+        return [py_launcher, '-3']
+    return None
+
+
+def _resolve_ig_script() -> Path | None:
+    candidates = [
+        ROOT / 'ig_download.py',
+        resolve_launch_dir() / 'ig_download.py',
+        Path.cwd() / 'ig_download.py',
+    ]
+    for path in candidates:
+        if path.exists() and path.is_file():
+            return path
+    return None
+
+
+def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
+    username = str(payload.get('username') or '').strip().lstrip('@')
+    output = str(payload.get('output') or '').strip()
+    sessionid = str(payload.get('sessionid') or '').strip()
+    count = int(payload.get('count') or 0)
+    use_cookies = bool(payload.get('use_cookies_from_browser'))
+
+    if not username:
+        return {'ok': False, 'error': 'missing_username'}
+    if not output:
+        return {'ok': False, 'error': 'missing_output'}
+
+    out_path = Path(output)
+    # Output must be an existing directory; avoid accidental file path usage.
+    if out_path.exists() and out_path.is_file():
+        return {'ok': False, 'error': 'output_is_file', 'output': str(out_path)}
+    try:
+        out_path.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        return {'ok': False, 'error': f'cannot_create_output: {exc}'}
+
+    script = _resolve_ig_script()
+    if script is None:
+        return {'ok': False, 'error': 'ig_script_not_found'}
+    py_cmd = _resolve_python_cmd()
+    if py_cmd is None:
+        return {'ok': False, 'error': 'python_not_found'}
+
+    cmd = [*py_cmd, str(script), username, '--output', str(out_path)]
+    if count > 0:
+        cmd.extend(['--count', str(count)])
+    if sessionid:
+        cmd.extend(['--sessionid', sessionid])
+    elif use_cookies:
+        cmd.extend(['--cookies-from-browser', 'chrome'])
+
+    try:
+        creationflags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0)
+        proc = subprocess.Popen(cmd, cwd=str(script.parent), creationflags=creationflags)
+        return {'ok': True, 'pid': proc.pid, 'cmd': cmd, 'script': str(script)}
+    except Exception as exc:
+        return {'ok': False, 'error': f'start_failed: {exc}', 'cmd': cmd}
 
 
 def main() -> int:

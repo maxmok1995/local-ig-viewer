@@ -1174,6 +1174,10 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
     <div style="font-size:11px;color:var(--muted);line-height:1.7;padding:2px 2px 4px">
       💡 获取方法：Chrome 打开 instagram.com → <b>F12</b> → 应用 → Cookie → 找 <b>sessionid</b> → 复制值
     </div>
+    <div class="igRow" style="gap:8px;align-items:center">
+      <button id="igRunBtn" style="flex:1;background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:8px;font-size:13px;cursor:pointer">在本地IG中一键开始下载</button>
+    </div>
+    <div class="igNote" id="igRunStatus">推荐：优先用此按钮，EXE 会自动启动下载任务。</div>
 
     <!-- 第一步：安装依赖 -->
     <div class="igStep" id="igStep1">
@@ -5263,6 +5267,20 @@ function buildIgAuthArgs(sidRaw){
   if(sid) return ` --sessionid ${quoteArg(sid)}`;
   return ' --cookies-from-browser chrome';
 }
+function guessCountFromUI(){
+  const activeChip=document.querySelector('#igCountChips .igRangePreset.active');
+  const custom=($('igCountCustom')?.value||'').trim();
+  const raw=custom||(activeChip?activeChip.dataset.n:'');
+  const n=parseInt(raw,10);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function validateOutputPathInput(v){
+  const s=(v||'').trim();
+  if(!s) return {ok:true,value:s};
+  // Block common accidental file-path inputs.
+  if(/\.(exe|bat|cmd|ps1|lnk)$/i.test(s)) return {ok:false,error:'保存路径必须是文件夹，不能是可执行文件'};
+  return {ok:true,value:s.replace(/[/\\]+$/,'')};
+}
 function looksLikePlaceholderSid(sid){
   const s=sanitizeSessionId(sid).toLowerCase();
   if(!s) return false;
@@ -5287,7 +5305,13 @@ $('igFetchBtn').addEventListener('click',async()=>{
   const activeChip=document.querySelector('#igCountChips .igRangePreset.active');
   const custom=$('igCountCustom').value.trim();
   const count=custom||(activeChip?activeChip.dataset.n:'');
-  const output=$('igOutput').value.trim().replace(/[/\\]+$/,'');
+  const checked=validateOutputPathInput($('igOutput').value||'');
+  if(!checked.ok){
+    toast(checked.error);
+    $('igRunStatus').textContent=`❌ ${checked.error}`;
+    return;
+  }
+  const output=checked.value;
   const dir=getHtmlDir();
   const effectiveOutput=output||(dir?`${dir}/downloads`:'downloads');
   const sid=($('igSessionId')?.value||'');
@@ -5310,6 +5334,54 @@ $('igFetchBtn').addEventListener('click',async()=>{
   updateIgStep3Note(username);
   ['igStep1','igStep2','igStep3'].forEach(id=>$(id).classList.add('on'));
   [$('igCmd1'),$('igCmd2')].forEach(ta=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';});
+});
+
+$('igRunBtn').addEventListener('click',async()=>{
+  const username=($('igInput').value||'').trim().replace(/^@/,'');
+  if(!username){$('igInput').focus();return;}
+  const checked=validateOutputPathInput($('igOutput').value||'');
+  if(!checked.ok){
+    toast(checked.error);
+    $('igRunStatus').textContent=`❌ ${checked.error}`;
+    return;
+  }
+  const dir=getHtmlDir();
+  const effectiveOutput=checked.value||(dir?`${dir}/downloads`:'downloads');
+  const sid=sanitizeSessionId(($('igSessionId')?.value||''));
+  const count=guessCountFromUI();
+  const payload={
+    username,
+    output:effectiveOutput,
+    count,
+    sessionid:sid,
+    use_cookies_from_browser:!sid,
+  };
+  $('igRunBtn').disabled=true;
+  $('igRunStatus').textContent='⏳ 正在启动下载任务…';
+  try{
+    const res=await fetch('/__run_ig_download__',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    const data=await res.json().catch(()=>({ok:false,error:'bad_json'}));
+    if(!res.ok||!data.ok){
+      const err=data?.error||`HTTP ${res.status}`;
+      $('igRunStatus').textContent=`❌ 启动失败：${err}`;
+      toast(`IG 下载启动失败：${err}`);
+      return;
+    }
+    const authTip=sid?'sessionid':'cookies-from-browser';
+    $('igRunStatus').textContent=`✅ 已启动下载任务（PID ${data.pid||'-'}，认证方式：${authTip}）`;
+    toast('已启动下载任务，请查看新打开的终端窗口');
+    ['igStep1','igStep2','igStep3'].forEach(id=>$(id).classList.add('on'));
+    updateIgStep3Note(username);
+  }catch(e){
+    $('igRunStatus').textContent=`❌ 启动失败：${e.message||e}`;
+    toast('IG 下载启动失败，请重试');
+  }finally{
+    $('igRunBtn').disabled=false;
+  }
 });
 
 function makeCopyBtn(btnId, cmdId){
