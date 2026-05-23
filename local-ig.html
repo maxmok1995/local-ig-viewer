@@ -5373,7 +5373,39 @@ $('igRunBtn').addEventListener('click',async()=>{
     }
     const authTip=sid?'sessionid':'cookies-from-browser';
     $('igRunStatus').textContent=`✅ 已启动下载任务（PID ${data.pid||'-'}，认证方式：${authTip}）`;
-    toast('已启动下载任务，请查看新打开的终端窗口');
+    toast('已启动下载任务，正在同步运行结果…');
+    if(data.pid){
+      const poll=async()=>{
+        try{
+          const r=await fetch('/__ig_download_status__',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({pid:data.pid}),
+          });
+          const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
+          if(!r.ok||!s.ok){
+            $('igRunStatus').textContent=`❌ 任务状态查询失败：${s.error||('HTTP '+r.status)}`;
+            return;
+          }
+          if(s.running){
+            $('igRunStatus').textContent=`⏳ 下载进行中（PID ${s.pid}）`;
+            setTimeout(poll,2000);
+            return;
+          }
+          if((s.exit_code||0)===0){
+            $('igRunStatus').textContent=`✅ 下载完成（PID ${s.pid}）`;
+            toast('IG 下载完成');
+          }else{
+            const tail=(s.tail||'').split('\\n').slice(-2).join(' | ');
+            $('igRunStatus').textContent=`❌ 下载失败（退出码 ${s.exit_code}）${tail?`：${tail}`:''}`;
+            toast('IG 下载失败，请查看日志');
+          }
+        }catch(err){
+          $('igRunStatus').textContent=`❌ 任务状态查询失败：${err.message||err}`;
+        }
+      };
+      setTimeout(poll,1500);
+    }
     ['igStep1','igStep2','igStep3'].forEach(id=>$(id).classList.add('on'));
     updateIgStep3Note(username);
   }catch(e){

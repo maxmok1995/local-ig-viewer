@@ -6,6 +6,8 @@ import socket
 import subprocess
 import sys
 import shutil
+import zlib
+import time
 import urllib.error
 import urllib.request
 import webbrowser
@@ -20,6 +22,7 @@ HOST = os.environ.get('LOCAL_IG_HOST', '127.0.0.1')
 LOCAL_IG_BOOTSTRAP_DIR = os.environ.get('LOCAL_IG_BOOTSTRAP_DIR', '本地IG')
 LOCAL_IG_ROLE_DIRS = ['角色1', '角色2']
 LOCAL_IG_OPENER_EXE_NAME = os.environ.get('LOCAL_IG_OPENER_EXE_NAME', '打开本地IG.exe')
+BOOTSTRAP_SYNC_FILES = ['ig_download.py', 'xhs_download.py', 'flat_convert.py', 'hhcat_convert.py', 'VERSION']
 STANDARD_SECOND_LEVEL_FOLDERS = [
     '人-合照', '人-摆拍', '人-自拍',
     '住-家', '住-旅店',
@@ -55,16 +58,38 @@ def ensure_bootstrap_local_ig(base: Path) -> tuple[Path, list[Path]]:
         created_roles.append(role_dir)
 
     # Keep a copy of launcher in 本地IG for one-folder usage.
+    # Always overwrite to avoid stale nested exe after launcher upgrades.
     try:
         if getattr(sys, 'frozen', False):
             src_exe = Path(sys.executable).resolve()
             dst_exe = root / LOCAL_IG_OPENER_EXE_NAME
-            if not dst_exe.exists():
-                dst_exe.write_bytes(src_exe.read_bytes())
+            dst_exe.write_bytes(src_exe.read_bytes())
     except Exception:
         pass
 
+    # Sync bundled helper scripts into 本地IG so one-click actions can run there.
+    for name in BOOTSTRAP_SYNC_FILES:
+        src = ROOT / name
+        dst = root / name
+        try:
+            if src.exists() and src.is_file():
+                dst.write_bytes(src.read_bytes())
+        except Exception:
+            pass
+
     return root, created_roles
+
+
+def sync_runtime_files_to_dir(target_dir: Path) -> None:
+    """Always sync bundled helper scripts to target_dir (best effort)."""
+    for name in BOOTSTRAP_SYNC_FILES:
+        src = ROOT / name
+        dst = target_dir / name
+        try:
+            if src.exists() and src.is_file():
+                dst.write_bytes(src.read_bytes())
+        except Exception:
+            pass
 
 
 def resolve_root() -> Path:
@@ -97,8 +122,17 @@ def resolve_root() -> Path:
 ROOT = resolve_root()
 STATUS_FILE = os.environ.get('LOCAL_IG_STATUS_FILE', '').strip()
 NO_BROWSER = os.environ.get('LOCAL_IG_NO_BROWSER', '').strip() == '1'
-INSTANCE_LOCK_PORT = int(os.environ.get('LOCAL_IG_INSTANCE_LOCK_PORT', '38765'))
+def default_instance_lock_port() -> int:
+    base = 38000
+    span = 2000
+    launch_dir = str(resolve_launch_dir()).lower()
+    offset = zlib.crc32(launch_dir.encode('utf-8')) % span
+    return base + offset
+
+
+INSTANCE_LOCK_PORT = int(os.environ.get('LOCAL_IG_INSTANCE_LOCK_PORT', str(default_instance_lock_port())))
 INSTANCE_LOCK_SOCKET: socket.socket | None = None
+IG_TASKS: dict[int, dict[str, Any]] = {}
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -114,7 +148,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path not in ('/__open_folder__', '/__run_ig_download__'):
+        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
@@ -124,6 +158,9 @@ class QuietHandler(SimpleHTTPRequestHandler):
             if self.path == '/__open_folder__':
                 path = str(data.get('path') or '').strip()
                 result = open_folder_in_explorer(path)
+            elif self.path == '/__ig_download_status__':
+                pid = int(data.get('pid') or 0)
+                result = get_ig_download_status(pid)
             else:
                 result = run_ig_download(data)
             self._send_json(result, status=200 if result.get('ok') else 400)
@@ -252,6 +289,8 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
         return {'ok': False, 'error': 'missing_output'}
 
     out_path = Path(output)
+    if not out_path.is_absolute():
+        out_path = (resolve_launch_dir() / out_path).resolve()
     # Output must be an existing directory; avoid accidental file path usage.
     if out_path.exists() and out_path.is_file():
         return {'ok': False, 'error': 'output_is_file', 'output': str(out_path)}
@@ -259,6 +298,23 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
         out_path.mkdir(parents=True, exist_ok=True)
     except Exception as exc:
         return {'ok': False, 'error': f'cannot_create_output: {exc}'}
+
+    # Ensure profile folder and template subfolders exist before downloader starts.
+    try:
+        profile_dir = out_path / username
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        role1_candidates = [
+            out_path / '角色1',
+            out_path.parent / '角色1',
+            resolve_launch_dir() / '角色1',
+        ]
+        role1_dir = next((p for p in role1_candidates if p.exists() and p.is_dir()), None)
+        if role1_dir is not None:
+            for child in role1_dir.iterdir():
+                if child.is_dir():
+                    (profile_dir / child.name).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
     script = _resolve_ig_script()
     if script is None:
@@ -276,15 +332,80 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
         cmd.extend(['--cookies-from-browser', 'chrome'])
 
     try:
-        creationflags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0)
-        proc = subprocess.Popen(cmd, cwd=str(script.parent), creationflags=creationflags)
-        return {'ok': True, 'pid': proc.pid, 'cmd': cmd, 'script': str(script)}
+        log_path = out_path / f'ig_download_{username}.log'
+        with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
+            logf.write(f'\n=== launch {time.strftime("%Y-%m-%d %H:%M:%S")} ===\n')
+            logf.flush()
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(script.parent),
+                stdout=logf,
+                stderr=logf,
+                creationflags=creationflags,
+                startupinfo=startupinfo,
+            )
+        IG_TASKS[proc.pid] = {'proc': proc, 'log': str(log_path)}
+        time.sleep(0.8)
+        ret = proc.poll()
+        if ret is not None:
+            tail = ''
+            try:
+                text = log_path.read_text(encoding='utf-8', errors='ignore')
+                tail = '\n'.join(text.splitlines()[-6:]).strip()
+            except Exception:
+                pass
+            msg = f'ig_process_exited_immediately(code={ret})'
+            if tail:
+                msg = f'{msg}: {tail}'
+            return {'ok': False, 'error': msg, 'cmd': cmd, 'log': str(log_path)}
+        return {
+            'ok': True,
+            'pid': proc.pid,
+            'cmd': cmd,
+            'script': str(script),
+            'log': str(log_path),
+        }
     except Exception as exc:
         return {'ok': False, 'error': f'start_failed: {exc}', 'cmd': cmd}
 
 
+def get_ig_download_status(pid: int) -> dict[str, Any]:
+    task = IG_TASKS.get(pid)
+    if not task:
+        return {'ok': False, 'error': 'pid_not_found', 'pid': pid}
+    proc: subprocess.Popen[Any] = task['proc']
+    log_path = Path(task['log'])
+    code = proc.poll()
+    tail = ''
+    try:
+        if log_path.exists():
+            text = log_path.read_text(encoding='utf-8', errors='ignore')
+            tail = '\n'.join(text.splitlines()[-20:])
+    except Exception:
+        tail = ''
+    return {
+        'ok': True,
+        'pid': pid,
+        'running': code is None,
+        'exit_code': None if code is None else int(code),
+        'log': str(log_path),
+        'tail': tail,
+    }
+
+
 def main() -> int:
     launch_dir = resolve_launch_dir()
+    exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else ''
+    is_installer_mode = exe_name == '安装本地IG.exe'
+    # Keep runtime helper scripts up to date even when running secondary exe in 本地IG.
+    if launch_dir.name == LOCAL_IG_BOOTSTRAP_DIR:
+        sync_runtime_files_to_dir(launch_dir)
+
     # If launched from inside "本地IG", do not generate another nested template.
     if launch_dir.name != LOCAL_IG_BOOTSTRAP_DIR:
         try:
@@ -292,6 +413,9 @@ def main() -> int:
             print(f'[信息] 已确保目录模板: {bootstrap_root}')
             for role_dir in role_dirs:
                 print(f'[信息] 已确保角色目录: {role_dir}')
+            if is_installer_mode:
+                print('[完成] 安装器模式：仅生成本地IG目录，不自动打开UI。')
+                return 0
         except Exception as exc:
             print(f'[警告] 创建模板目录失败: {exc}')
 

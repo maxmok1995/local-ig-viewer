@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import random
+import re
 import platform
 import subprocess
 import argparse
@@ -32,9 +33,11 @@ import shutil
 from itertools import islice
 from pathlib import Path
 from urllib.parse import unquote
+from types import SimpleNamespace
 
 RATE_LIMIT_WAIT    = 300  # 被限流后首次等待秒数（5 分钟）
 RATE_LIMIT_RETRIES = 5    # 最多重试次数
+MOBILE_UA = 'Instagram 219.0.0.12.117 Android (28/9; 420dpi; 1080x2160; samsung; SM-G960F; star2lte; samsungexynos9810; en_US; 301006047)'
 
 
 def open_folder(path: Path):
@@ -237,6 +240,162 @@ def _clean_sessionid(raw: str) -> str:
     return unquote(sid)
 
 
+def _sync_role1_template_dirs(profile_dir: Path):
+    """
+    Auto-create category folders in the downloaded profile directory
+    based on sibling 本地IG/角色1 directory names.
+    """
+    try:
+        candidates = [
+            profile_dir.parent / '角色1',
+            profile_dir.parent.parent / '角色1',
+            profile_dir.parent.parent.parent / '角色1',
+        ]
+        role1_dir = next((p for p in candidates if p.exists() and p.is_dir()), None)
+        if role1_dir is None:
+            return
+        for child in role1_dir.iterdir():
+            if child.is_dir():
+                (profile_dir / child.name).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # Template sync is best-effort and must not block downloads.
+        pass
+
+
+def _get_sessionid_from_loader(L):
+    return L.context._session.cookies.get('sessionid', domain='.instagram.com') or ''
+
+
+def _mobile_api_session(sessionid: str):
+    import requests as _req
+    s = _req.Session()
+    s.cookies.set('sessionid', sessionid, domain='.instagram.com', path='/')
+    s.headers.update({
+        'User-Agent': MOBILE_UA,
+        'X-IG-App-ID': '936619743392459',
+        'Accept': '*/*',
+    })
+    return s
+
+
+def _get_json_with_retry(ms, url: str, params=None, attempts: int = 4):
+    last_err = None
+    for i in range(1, attempts + 1):
+        try:
+            r = ms.get(url, params=params, timeout=25)
+            if r.status_code == 429:
+                wait = min(60, 5 * (2 ** (i - 1)))
+                print(f"⏳  接口限流（429），第 {i}/{attempts} 次，等待 {wait}s 后重试…")
+                time.sleep(wait + random.uniform(0, 1.5))
+                continue
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_err = e
+            if i < attempts:
+                wait = min(30, 3 * i)
+                time.sleep(wait + random.uniform(0, 1.0))
+                continue
+            break
+    raise last_err or RuntimeError('request_failed')
+
+
+def _resolve_user_id_by_username(ms, username: str) -> str:
+    # Fallback-0: parse user id from public profile HTML to avoid API 429.
+    try:
+        r = ms.get(f'https://www.instagram.com/{username}/', timeout=20)
+        if r.status_code == 200:
+            text = r.text or ''
+            m = re.search(r'"profilePage_([0-9]+)"', text)
+            if m:
+                return m.group(1)
+            m2 = re.search(r'"id":"([0-9]{5,})"', text)
+            if m2:
+                return m2.group(1)
+    except Exception:
+        pass
+
+    candidates = [
+        ('https://www.instagram.com/api/v1/users/web_profile_info/', {'username': username}),
+        ('https://i.instagram.com/api/v1/users/web_profile_info/', {'username': username}),
+        (f'https://i.instagram.com/api/v1/users/{username}/usernameinfo/', None),
+    ]
+    for url, params in candidates:
+        try:
+            data = _get_json_with_retry(ms, url, params=params, attempts=4)
+            user = (data.get('data') or {}).get('user') or data.get('user') or {}
+            uid = str(user.get('id') or user.get('pk') or '')
+            if uid:
+                return uid
+        except Exception:
+            continue
+    raise RuntimeError('cannot_resolve_user_id')
+
+
+def _extract_mobile_items(ms, user_id: str, limit: int):
+    items = []
+    max_id = None
+    while len(items) < limit:
+        params = {'count': min(33, limit - len(items))}
+        if max_id:
+            params['max_id'] = max_id
+        data = _get_json_with_retry(
+            ms,
+            f'https://i.instagram.com/api/v1/feed/user/{user_id}/',
+            params=params,
+            attempts=4,
+        )
+        batch = data.get('items') or []
+        if not batch:
+            break
+        items.extend(batch)
+        max_id = data.get('next_max_id')
+        if not max_id:
+            break
+    return items[:limit]
+
+
+def _post_from_mobile_item(item):
+    import datetime as _dt
+    ts = int(item.get('taken_at') or 0)
+    dt = _dt.datetime.fromtimestamp(ts)
+    shortcode = item.get('code') or item.get('id', 'unknown')
+    caption = ((item.get('caption') or {}).get('text')) or ''
+    location = item.get('location') or {}
+    is_video = bool(item.get('media_type') == 2)
+
+    sidecar = []
+    if item.get('media_type') == 8:
+        for c in item.get('carousel_media') or []:
+            iv = (c.get('image_versions2') or {}).get('candidates') or []
+            display = (iv[0].get('url') if iv else '') or ''
+            vvs = c.get('video_versions') or []
+            video = (vvs[0].get('url') if vvs else None)
+            sidecar.append(SimpleNamespace(
+                display_url=display,
+                is_video=bool(video),
+                video_url=video,
+            ))
+
+    iv_main = (item.get('image_versions2') or {}).get('candidates') or []
+    main_img = (iv_main[0].get('url') if iv_main else '') or ''
+    vv_main = item.get('video_versions') or []
+    main_video = (vv_main[0].get('url') if vv_main else None)
+    return SimpleNamespace(
+        date_local=dt,
+        shortcode=shortcode,
+        caption=caption,
+        typename='GraphSidecar' if item.get('media_type') == 8 else 'GraphImage',
+        is_video=is_video,
+        url=main_img,
+        video_url=main_video,
+        likes=item.get('like_count'),
+        _node={'location': {'name': location.get('name', ''), 'id': location.get('pk')}},
+        get_sidecar_nodes=lambda: sidecar,
+        location=SimpleNamespace(name=location.get('name', ''), id=location.get('pk')),
+    )
+
+
 # ── 主函数 ────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(
@@ -307,6 +466,7 @@ def main():
         output_dir  = Path(args.output)
         profile_dir = output_dir / args.username
         profile_dir.mkdir(parents=True, exist_ok=True)
+        _sync_role1_template_dirs(profile_dir)
         (profile_dir / '_path.txt').write_text(
             str(profile_dir.resolve()).replace('\\', '/'),
             encoding='utf-8',
@@ -468,30 +628,56 @@ def main():
 
     session = requests.Session()
 
-    if args.start is not None or args.end is not None:
-        if total is None:
-            print("❌  当前会话无法读取总数，暂不支持 --start/--end 范围模式")
-            print("    请改用 --count N，或切换登录方式后重试")
-            sys.exit(1)
-        start = max(1, args.start or 1)
-        end   = min(args.end or total, total)
-        limit = max(0, end - start + 1)
-        posts_iter = islice(profile.get_posts(), start - 1, end)
-        print(f"✓  @{profile.username}  {total} 条帖子，准备下载第 {start}–{end} 条（共 {limit} 条）\n")
-    else:
-        if args.count:
-            limit = min(args.count, total) if total is not None else args.count
-            posts_iter = islice(profile.get_posts(), limit)
-            total_label = f"{total} 条帖子，" if total is not None else ""
-            print(f"✓  @{profile.username}  {total_label}准备下载最新 {limit} 条\n")
-        else:
+    try:
+        if args.start is not None or args.end is not None:
             if total is None:
-                print("❌  当前会话无法读取总数，且未提供 --count")
-                print("    请改用: --count N（例如 --count 200）")
+                print("❌  当前会话无法读取总数，暂不支持 --start/--end 范围模式")
+                print("    请改用 --count N，或切换登录方式后重试")
                 sys.exit(1)
-            limit = total
-            posts_iter = islice(profile.get_posts(), limit)
-            print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
+            start = max(1, args.start or 1)
+            end   = min(args.end or total, total)
+            limit = max(0, end - start + 1)
+            posts_iter = islice(profile.get_posts(), start - 1, end)
+            print(f"✓  @{profile.username}  {total} 条帖子，准备下载第 {start}–{end} 条（共 {limit} 条）\n")
+        else:
+            if args.count:
+                limit = min(args.count, total) if total is not None else args.count
+                posts_iter = islice(profile.get_posts(), limit)
+                total_label = f"{total} 条帖子，" if total is not None else ""
+                print(f"✓  @{profile.username}  {total_label}准备下载最新 {limit} 条\n")
+            else:
+                if total is None:
+                    print("❌  当前会话无法读取总数，且未提供 --count")
+                    print("    请改用: --count N（例如 --count 200）")
+                    sys.exit(1)
+                limit = total
+                posts_iter = islice(profile.get_posts(), limit)
+                print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
+    except instaloader.exceptions.QueryReturnedBadRequestException as e:
+        print(f"⚠️  GraphQL 接口受限：{e}")
+        print("    尝试切换到移动端 API 降级模式…")
+        sid = _get_sessionid_from_loader(L)
+        if not sid:
+            print("❌  降级模式需要有效 sessionid（请填写 Session ID 或使用可读 Cookie）")
+            sys.exit(1)
+        if args.start is not None or args.end is not None:
+            print("❌  降级模式暂不支持 --start/--end，请改用 --count")
+            sys.exit(1)
+        if not args.count:
+            print("❌  降级模式需要 --count（建议 20）")
+            sys.exit(1)
+        try:
+            ms = _mobile_api_session(sid)
+            uid = _resolve_user_id_by_username(ms, args.username)
+            raw_items = _extract_mobile_items(ms, uid, args.count)
+            posts = [_post_from_mobile_item(it) for it in raw_items]
+            posts_iter = iter(posts)
+            limit = len(posts)
+            print(f"✓  降级模式就绪，获取到 {limit} 条，准备下载\n")
+        except Exception as fallback_err:
+            print(f"❌  降级模式失败：{fallback_err}")
+            print("    请更换 sessionid 后重试")
+            sys.exit(1)
     done = skip = fail = 0
     i = 0
 
