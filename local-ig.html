@@ -1372,7 +1372,7 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       </div>
       <!-- 命令 -->
       <div>
-        <div class="igAddLabel">執行命令（在終端貼上運行）</div>
+        <div class="igAddLabel" id="igAddActionLabel">執行命令（在終端貼上運行）</div>
         <div id="igAddCmd"></div>
       </div>
     </div>
@@ -5585,11 +5585,13 @@ lbCaption.addEventListener('input',()=>{
 (function(){
   const modal=$('igAddModal');
   const cmdEl=$('igAddCmd');
+  const actionLabel=$('igAddActionLabel');
   const copyBtn=$('igAddCopyBtn');
   const refreshBtn=$('igAddRefreshBtn');
   const customNInp=$('igAddCustomN');
   // 'ig' | 'xhs' | 'flat' | 'hhcat'
   let platform='ig';
+  let igTaskPid=0;
 
   // 下載類平台使用 output 的父層路徑
   function getOutPath(){
@@ -5663,7 +5665,13 @@ lbCaption.addEventListener('input',()=>{
     const cmd=buildCmd();
     cmdEl.textContent=cmd||EMPTY_HINTS[platform]||'';
     cmdEl.style.display='block';
-    copyBtn.textContent='複製命令';
+    if(platform==='ig'){
+      actionLabel.textContent='執行結果（本地IG一鍵下載）';
+      copyBtn.textContent='在本地IG中一鍵開始下載';
+    }else{
+      actionLabel.textContent='執行命令（在終端貼上運行）';
+      copyBtn.textContent='複製命令';
+    }
     // 轉換工具：隱藏數量欄；下載工具：顯示
     const isDownload=platform==='ig'||platform==='xhs';
     $('igAddCountSection').style.display=isDownload?'':'none';
@@ -5732,7 +5740,75 @@ lbCaption.addEventListener('input',()=>{
       toast('命令已複製',2000);
     });
   }
-  copyBtn.addEventListener('click',doCopy);
+  async function runIgOneClick(){
+    const user=$('igAddUser').value.trim().replace(/^@/,'');
+    if(!user){$('igAddUser')?.focus();return;}
+    const n=getCount();
+    const sidRaw=(localStorage.getItem('ig-session-id')||'');
+    const sid=(typeof sanitizeSessionId==='function')?sanitizeSessionId(sidRaw):sidRaw.trim();
+    const payload={
+      username:user,
+      output:getOutPath(),
+      count:(n&&parseInt(n,10)>0)?parseInt(n,10):0,
+      sessionid:sid,
+      use_cookies_from_browser:!sid,
+    };
+    copyBtn.disabled=true;
+    cmdEl.textContent='⏳ 正在啟動下載任務…';
+    try{
+      const res=await fetch('/__run_ig_download__',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),
+      });
+      const data=await res.json().catch(()=>({ok:false,error:'bad_json'}));
+      if(!res.ok||!data.ok){
+        cmdEl.textContent=`❌ 啟動失敗：${data?.error||('HTTP '+res.status)}`;
+        return;
+      }
+      igTaskPid=data.pid||0;
+      const authTip=sid?'sessionid':'cookies-from-browser';
+      cmdEl.textContent=`✅ 已啟動下載（PID ${igTaskPid||'-'}，認證：${authTip}）`;
+      const poll=async()=>{
+        if(!igTaskPid) return;
+        try{
+          const r=await fetch('/__ig_download_status__',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({pid:igTaskPid}),
+          });
+          const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
+          if(!r.ok||!s.ok){
+            cmdEl.textContent=`❌ 任務狀態查詢失敗：${s?.error||('HTTP '+r.status)}`;
+            return;
+          }
+          if(s.running){
+            cmdEl.textContent=`⏳ 下載進行中（PID ${s.pid}）`;
+            setTimeout(poll,2000);
+            return;
+          }
+          if((s.exit_code||0)===0){
+            cmdEl.textContent='✅ 下載完成，請點「↻ 刷新相冊」';
+            toast('下載完成，請刷新相冊',2200);
+          }else{
+            const tail=(s.tail||'').split('\n').slice(-8).join('\n').trim();
+            cmdEl.textContent=`❌ 下載失敗（退出碼 ${s.exit_code}）：${tail||''}`;
+          }
+        }catch(e){
+          cmdEl.textContent=`❌ 任務狀態查詢失敗：${e.message||e}`;
+        }
+      };
+      setTimeout(poll,1200);
+    }catch(e){
+      cmdEl.textContent=`❌ 啟動失敗：${e.message||e}`;
+    }finally{
+      copyBtn.disabled=false;
+    }
+  }
+  copyBtn.addEventListener('click',()=>{
+    if(platform==='ig'){ runIgOneClick(); return; }
+    doCopy();
+  });
 
   refreshBtn.addEventListener('click',async()=>{
     if(!S.rootDirHandle){toast('請先開啟文件夾',2000);return;}
