@@ -1138,14 +1138,14 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
     </div>
     <div id="quickIGPathRow"></div>
     <div id="quickIGCmd"></div>
-    <button id="quickIGCopyBtn">生成并复制命令</button>
+    <button id="quickIGCopyBtn">一键下载</button>
   </div>
 
   <!-- IG 导入面板 -->
   <div id="igPanel">
     <div class="igRow">
       <input type="text" id="igInput" placeholder="输入 IG 用户名，如 natgeo" autocomplete="off" spellcheck="false">
-      <button id="igFetchBtn">生成命令</button>
+      <button id="igFetchBtn">准备下载</button>
     </div>
     <!-- 下载范围选择 -->
     <div style="display:flex;flex-direction:column;gap:6px">
@@ -1184,16 +1184,16 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       <div class="igStepLabel"><span>1</span>安装依赖（只需运行一次）</div>
       <div class="igCmdRow">
         <textarea class="igCmd" id="igCmd1" rows="1" readonly></textarea>
-        <button class="igCopyBtn" id="igCopy1">复制</button>
+        <button class="igCopyBtn" id="igCopy1">一键下载</button>
       </div>
     </div>
 
     <!-- 第二步：下载 -->
     <div class="igStep" id="igStep2">
-      <div class="igStepLabel"><span>2</span>在终端运行下载<span id="igStep2Note" style="font-weight:400;margin-left:6px;color:var(--muted)"></span></div>
+      <div class="igStepLabel"><span>2</span>一键执行下载<span id="igStep2Note" style="font-weight:400;margin-left:6px;color:var(--muted)"></span></div>
       <div class="igCmdRow">
         <textarea class="igCmd" id="igCmd2" rows="2" readonly></textarea>
-        <button class="igCopyBtn" id="igCopy2">复制</button>
+        <button class="igCopyBtn" id="igCopy2">一键下载</button>
       </div>
     </div>
 
@@ -1208,7 +1208,7 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
   <div id="xhsPanel">
     <div class="igRow">
       <input type="text" id="xhsInput" placeholder="用户主页 URL 或 user_id" autocomplete="off" spellcheck="false">
-      <button id="xhsFetchBtn">生成命令</button>
+      <button id="xhsFetchBtn">一键导入</button>
     </div>
 
     <!-- 第一步：安装依赖 -->
@@ -1216,16 +1216,16 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       <div class="igStepLabel"><span>1</span>安装依赖（只需运行一次）</div>
       <div class="igCmdRow">
         <textarea class="igCmd" id="xhsCmd1" rows="1" readonly></textarea>
-        <button class="igCopyBtn" id="xhsCopy1">复制</button>
+        <button class="igCopyBtn" id="xhsCopy1">一键导入</button>
       </div>
     </div>
 
     <!-- 第二步：下载 -->
     <div class="igStep" id="xhsStep2">
-      <div class="igStepLabel"><span>2</span>在终端运行（会提示粘贴 Cookie）</div>
+      <div class="igStepLabel"><span>2</span>一键执行导入</div>
       <div class="igCmdRow">
         <textarea class="igCmd" id="xhsCmd2" rows="2" readonly></textarea>
-        <button class="igCopyBtn" id="xhsCopy2">复制</button>
+        <button class="igCopyBtn" id="xhsCopy2">一键导入</button>
       </div>
     </div>
 
@@ -1372,12 +1372,12 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       </div>
       <!-- 命令 -->
       <div>
-        <div class="igAddLabel" id="igAddActionLabel">執行命令（在終端貼上運行）</div>
+        <div class="igAddLabel" id="igAddActionLabel">執行結果（本地IG一鍵執行）</div>
         <div id="igAddCmd"></div>
       </div>
     </div>
     <div id="igAddFoot">
-      <button id="igAddCopyBtn">複製命令</button>
+      <button id="igAddCopyBtn">在本地IG中一鍵執行</button>
       <button id="igAddRefreshBtn">↻ 刷新相冊</button>
     </div>
   </div>
@@ -1435,13 +1435,13 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
         </div>
       </div>
       <div>
-        <div class="transLabel">執行命令（在終端貼上運行）</div>
+        <div class="transLabel">執行結果（本地IG一鍵執行）</div>
         <div id="transCmd"></div>
       </div>
     </div>
     <div id="transFoot">
-      <button id="transCopyCmdBtn">複製 CMD</button>
-      <button id="transCopyPsBtn">複製 PowerShell</button>
+      <button id="transCopyCmdBtn">一鍵翻譯</button>
+      <button id="transCopyPsBtn">查看命令</button>
       <button id="transRefreshBtn">↻ 刷新相冊</button>
       <button id="transCloseBtn2">取消</button>
     </div>
@@ -1716,12 +1716,12 @@ const LANGS = {
     openFolder:'📂 選擇本地照片資料夾', fromIG:'📥 從 Instagram 導入',
     note:'需要 Chrome 或 Edge 瀏覽器 · 所有資料僅在本地儲存',
     compatError:'⚠️ 請改用 Chrome 或 Edge',
-    igPlaceholder:'輸入 IG 用戶名，如 natgeo', igGenerate:'生成指令',
+    igPlaceholder:'輸入 IG 用戶名，如 natgeo', igGenerate:'準備下載',
     igCount:'自訂上限', igCountUnit:'條', igCountHint:'（留空＝全部）', igCountAll:'全部（可能較慢）',
     igModeCount:'數量', igModeRange:'範圍', igRangeFrom:'第', igRangeTo:'至',
     igTotalLabel:'帳號總帖數', igPresetHint:'輸入總帖數後自動生成分段',
     igOutput:'儲存路徑', igOutputPlaceholder:'./downloads（預設）',
-    igStep1:'安裝 / 升級依賴', igStepCheck:'查詢帖數並選擇範圍', igStep2:'在終端機執行下載',
+    igStep1:'安裝 / 升級依賴', igStepCheck:'查詢帖數並選擇範圍', igStep2:'一鍵執行下載',
     igTotalLabel2:'執行後輸入帖數',
     igStep3:'下載完成後', igStep3Note:'點「選擇本地照片資料夾」→ 選中 {path} 目錄',
     copy:'複製', copied:'✓ 已複製',
@@ -1746,12 +1746,12 @@ const LANGS = {
     openFolder:'📂 选择本地照片文件夹', fromIG:'📥 从 Instagram 导入',
     note:'需要 Chrome 或 Edge 浏览器 · 所有数据仅在本地存储',
     compatError:'⚠️ 请改用 Chrome 或 Edge',
-    igPlaceholder:'输入 IG 用户名，如 natgeo', igGenerate:'生成命令',
+    igPlaceholder:'输入 IG 用户名，如 natgeo', igGenerate:'准备下载',
     igCount:'自定上限', igCountUnit:'条', igCountHint:'（留空=全部）', igCountAll:'全部（可能较慢）',
     igModeCount:'数量', igModeRange:'范围', igRangeFrom:'第', igRangeTo:'至',
     igTotalLabel:'账号总帖数', igPresetHint:'输入总帖数后自动生成分段',
     igOutput:'保存路径', igOutputPlaceholder:'./downloads（默认）',
-    igStep1:'安装 / 升级依赖', igStepCheck:'查询帖数并选择范围', igStep2:'在终端运行下载',
+    igStep1:'安装 / 升级依赖', igStepCheck:'查询帖数并选择范围', igStep2:'一键执行下载',
     igTotalLabel2:'运行后输入帖数',
     igStep3:'下载完成后', igStep3Note:'点「选择本地照片文件夹」→ 选中 {path} 目录',
     copy:'复制', copied:'✓ 已复制',
@@ -5416,19 +5416,8 @@ $('igRunBtn').addEventListener('click',async()=>{
   }
 });
 
-function makeCopyBtn(btnId, cmdId){
-  $(btnId).addEventListener('click',()=>{
-    const text=$(cmdId).value;
-    navigator.clipboard?.writeText(text).then(()=>{
-      const btn=$(btnId);
-      btn.textContent=t('copied');btn.classList.add('done');
-      toast(t('toastCopied'));
-      setTimeout(()=>{btn.textContent=t('copy');btn.classList.remove('done');},1800);
-    });
-  });
-}
-makeCopyBtn('igCopy1','igCmd1');
-makeCopyBtn('igCopy2','igCmd2');
+$('igCopy1').addEventListener('click',()=>$('igRunBtn').click());
+$('igCopy2').addEventListener('click',()=>$('igRunBtn').click());
 $('igInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('igFetchBtn').click();});
 
 // ── XHS 导入面板 ──────────────────────────────────────────────────────────────
@@ -5453,16 +5442,62 @@ $('xhsFetchBtn').addEventListener('click',()=>{
   // 提取 user_id（URL 或直接字符串）
   const m=raw.match(/\/user\/profile\/([0-9a-fA-F]{20,})/);
   const uid=m?m[1]:raw;
+  const checked=validateOutputPathInput($('igOutput').value||'');
+  if(!checked.ok){toast(checked.error);return;}
   const dir=getHtmlDir();
-  const output=dir?`${dir}/downloads`:'downloads';
-  $('xhsCmd1').value='pip install xhs requests';
-  $('xhsCmd2').value=`python "${getXhsScriptPath()}" ${uid} --output "${output}"`;
+  const output=checked.value||(dir?`${dir}/downloads`:'downloads');
+  $('xhsCmd1').value='⏳ 正在启动导入任务…';
+  $('xhsCmd2').value='';
   $('xhsUserDisplay').textContent=uid;
   ['xhsStep1','xhsStep2','xhsStep3'].forEach(id=>$(id).classList.add('on'));
   [$('xhsCmd1'),$('xhsCmd2')].forEach(ta=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';});
+  fetch('/__run_add_task__',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({platform:'xhs',user:uid,output,count:0,cookie:$('igAddXhsCookie')?.value?.trim?.()||''}),
+  })
+  .then(async(res)=>{
+    const data=await res.json().catch(()=>({ok:false,error:'bad_json'}));
+    if(!res.ok||!data.ok){
+      const err=data?.error||`HTTP ${res.status}`;
+      $('xhsCmd1').value=`❌ 启动失败：${err}`;
+      return;
+    }
+    const pid=data.pid||0;
+    $('xhsCmd1').value=`✅ 已启动导入任务（PID ${pid}）`;
+    const poll=async()=>{
+      try{
+        const r=await fetch('/__ig_download_status__',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({pid}),
+        });
+        const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
+        if(!r.ok||!s.ok){
+          $('xhsCmd2').value=`❌ 状态查询失败：${s?.error||('HTTP '+r.status)}`;
+          return;
+        }
+        if(s.running){
+          $('xhsCmd2').value=`⏳ 导入进行中（PID ${s.pid}）`;
+          setTimeout(poll,2000);
+          return;
+        }
+        if((s.exit_code||0)===0){
+          $('xhsCmd2').value='✅ 导入完成，请点「↻ 刷新相册」';
+        }else{
+          const tail=(s.tail||'').split('\n').slice(-6).join('\n').trim();
+          $('xhsCmd2').value=`❌ 导入失败（退出码 ${s.exit_code}）\n${tail||''}`;
+        }
+      }catch(e){
+        $('xhsCmd2').value=`❌ 状态查询失败：${e.message||e}`;
+      }
+    };
+    setTimeout(poll,1200);
+  })
+  .catch((e)=>{$('xhsCmd1').value=`❌ 启动失败：${e.message||e}`;});
 });
-makeCopyBtn('xhsCopy1','xhsCmd1');
-makeCopyBtn('xhsCopy2','xhsCmd2');
+$('xhsCopy1').addEventListener('click',()=>$('xhsFetchBtn').click());
+$('xhsCopy2').addEventListener('click',()=>$('xhsFetchBtn').click());
 $('xhsInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('xhsFetchBtn').click();});
 $('igOutput').addEventListener('input',()=>{
   const v=$('igOutput').value;
@@ -5496,22 +5531,28 @@ $('igSessionId').addEventListener('input',()=>{
     });
   });
 
-  function buildCmd(){
+  function buildPayload(){
     const user=userInput.value.trim().replace(/^@/,'');
     if(!user) return null;
     const chip=document.querySelector('#quickIGChips .igRangePreset.active');
     const n=chip?chip.dataset.n:'';
     const outPath=S.rootAbsPath||'downloads';
-    const sid=($('igSessionId')?.value||'');
-    return `python ${quoteArg(getIgScriptPath())} ${user}${n?' --count '+n:''} --output ${quoteArg(outPath)}${buildIgAuthArgs(sid)}`;
+    const sid=sanitizeSessionId(($('igSessionId')?.value||''));
+    return {
+      username:user,
+      output:outPath,
+      count:(n&&parseInt(n,10)>0)?parseInt(n,10):0,
+      sessionid:sid,
+      use_cookies_from_browser:!sid,
+    };
   }
 
   function refreshPanel(){
     const outPath=S.rootAbsPath||'';
     pathRow.textContent=outPath?`保存至：${outPath}`:'';
     pathRow.style.display=outPath?'':'none';
-    const cmd=buildCmd();
-    if(cmd){cmdEl.textContent=cmd;cmdEl.style.display='block';}
+    const payload=buildPayload();
+    if(payload){cmdEl.textContent=`账号：@${payload.username}，点击下方按钮一键下载`;cmdEl.style.display='block';}
     else{cmdEl.style.display='none';}
   }
 
@@ -5538,15 +5579,47 @@ $('igSessionId').addEventListener('input',()=>{
     btn.addEventListener('click',refreshPanel);
   });
 
-  copyBtn.addEventListener('click',()=>{
-    const cmd=buildCmd();
-    if(!cmd){userInput.focus();toast('请先输入 IG 用户名');return;}
-    cmdEl.textContent=cmd;cmdEl.style.display='block';
-    navigator.clipboard?.writeText(cmd).then(()=>{
-      copyBtn.textContent='✅ 已复制！';
-      toast('命令已复制，请在终端粘贴运行');
-      setTimeout(()=>{ copyBtn.textContent='生成并复制命令'; },2000);
-    });
+  copyBtn.addEventListener('click',async()=>{
+    const payload=buildPayload();
+    if(!payload){userInput.focus();toast('请先输入 IG 用户名');return;}
+    copyBtn.disabled=true;
+    cmdEl.textContent='⏳ 正在启动下载任务…';cmdEl.style.display='block';
+    try{
+      const res=await fetch('/__run_ig_download__',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),
+      });
+      const data=await res.json().catch(()=>({ok:false,error:'bad_json'}));
+      if(!res.ok||!data.ok){
+        cmdEl.textContent=`❌ 启动失败：${data?.error||('HTTP '+res.status)}`;
+        return;
+      }
+      const pid=data.pid||0;
+      cmdEl.textContent=`✅ 已启动下载（PID ${pid}）`;
+      const poll=async()=>{
+        try{
+          const r=await fetch('/__ig_download_status__',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({pid}),
+          });
+          const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
+          if(!r.ok||!s.ok){ cmdEl.textContent=`❌ 状态查询失败：${s?.error||('HTTP '+r.status)}`; return; }
+          if(s.running){ cmdEl.textContent=`⏳ 下载进行中（PID ${s.pid}）`; setTimeout(poll,2000); return; }
+          if((s.exit_code||0)===0) cmdEl.textContent='✅ 下载完成，请刷新相册';
+          else{
+            const tail=(s.tail||'').split('\n').slice(-4).join(' | ');
+            cmdEl.textContent=`❌ 下载失败（退出码 ${s.exit_code}）${tail?`：${tail}`:''}`;
+          }
+        }catch(e){ cmdEl.textContent=`❌ 状态查询失败：${e.message||e}`; }
+      };
+      setTimeout(poll,1200);
+    }catch(e){
+      cmdEl.textContent=`❌ 启动失败：${e.message||e}`;
+    }finally{
+      copyBtn.disabled=false;
+    }
   });
 
   userInput.addEventListener('keydown',e=>{if(e.key==='Enter')copyBtn.click();});
@@ -6093,9 +6166,9 @@ $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(S.currentAlbum))
   function refreshCmd(){
     const folder=getFreshFolderPath();
     $('transFolderPath').textContent=folder||'（未開啟文件夾，翻譯後需手動選擇）';
-    cmdEl.textContent=buildCmd();
-    $('transCopyCmdBtn').textContent='複製 CMD';
-    $('transCopyPsBtn').textContent='複製 PowerShell';
+    cmdEl.textContent='點「一鍵翻譯」後顯示執行狀態';
+    $('transCopyCmdBtn').textContent='一鍵翻譯';
+    $('transCopyPsBtn').textContent='查看命令';
   }
 
   // 語言 chips
@@ -6107,25 +6180,51 @@ $('btnAddPosts').addEventListener('click',()=>openAddPostsModal(S.currentAlbum))
     refreshCmd();
   });
 
-  function copyTransCommand(btn, text, successMsg){
-    navigator.clipboard?.writeText(text).then(()=>{
-      btn.textContent='✅ 已複製！';
-      toast(successMsg,3000);
-    }).catch(()=>{
-      const inp=document.createElement('input');
-      inp.style.cssText='position:fixed;top:-999px';
-      inp.value=text;document.body.appendChild(inp);inp.select();
-      document.execCommand('copy');document.body.removeChild(inp);
-      btn.textContent='✅ 已複製！';
-      toast('命令已複製',2000);
-    });
-  }
-
-  copyCmdBtn.addEventListener('click',()=>{
-    copyTransCommand(copyCmdBtn, buildCmd(), 'CMD 命令已複製，在終端貼上執行即可開啟翻譯工具');
+  copyCmdBtn.addEventListener('click',async()=>{
+    const folder=getFreshFolderPath();
+    copyCmdBtn.disabled=true;
+    cmdEl.textContent='⏳ 正在啟動翻譯任務…';
+    try{
+      const res=await fetch('/__run_add_task__',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({platform:'trans',path:folder,lang:selectedLang}),
+      });
+      const data=await res.json().catch(()=>({ok:false,error:'bad_json'}));
+      if(!res.ok||!data.ok){
+        cmdEl.textContent=`❌ 啟動失敗：${data?.error||('HTTP '+res.status)}`;
+        return;
+      }
+      const pid=data.pid||0;
+      cmdEl.textContent=`✅ 已啟動翻譯（PID ${pid}）`;
+      const poll=async()=>{
+        try{
+          const r=await fetch('/__ig_download_status__',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({pid}),
+          });
+          const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
+          if(!r.ok||!s.ok){ cmdEl.textContent=`❌ 狀態查詢失敗：${s?.error||('HTTP '+r.status)}`; return; }
+          if(s.running){ cmdEl.textContent=`⏳ 翻譯進行中（PID ${s.pid}）`; setTimeout(poll,2000); return; }
+          if((s.exit_code||0)===0) cmdEl.textContent='✅ 翻譯完成，請點「↻ 刷新相冊」';
+          else{
+            const tail=(s.tail||'').split('\n').slice(-6).join('\n').trim();
+            cmdEl.textContent=`❌ 翻譯失敗（退出碼 ${s.exit_code}）\n${tail||''}`;
+          }
+        }catch(e){ cmdEl.textContent=`❌ 狀態查詢失敗：${e.message||e}`; }
+      };
+      setTimeout(poll,1200);
+    }catch(e){
+      cmdEl.textContent=`❌ 啟動失敗：${e.message||e}`;
+    }finally{
+      copyCmdBtn.disabled=false;
+    }
   });
   copyPsBtn.addEventListener('click',()=>{
-    copyTransCommand(copyPsBtn, buildPowerShellCmd(), 'PowerShell 命令已複製，在終端貼上執行即可開啟翻譯工具');
+    const cmd=buildPowerShellCmd();
+    cmdEl.textContent=cmd;
+    toast('已顯示命令（可作為備用）',1800);
   });
 
   const refreshBtn2=$('transRefreshBtn');

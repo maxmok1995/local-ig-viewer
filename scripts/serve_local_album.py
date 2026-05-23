@@ -363,6 +363,25 @@ def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
             log_path = target / f'{platform}_convert_{int(time.time())}.log'
             return _start_background_task(cmd, script.parent, log_path)
 
+        if platform == 'trans':
+            folder = str(payload.get('path') or '').strip()
+            lang = str(payload.get('lang') or 'en').strip() or 'en'
+            script = _resolve_script('APP - deep-translator.py')
+            if script is None:
+                return {'ok': False, 'error': 'trans_script_not_found'}
+            cmd = [*py_cmd, str(script), '--lang', lang]
+            log_dir = resolve_launch_dir()
+            if folder:
+                target = Path(folder)
+                if not target.is_absolute():
+                    target = (launch_dir / target).resolve()
+                if not target.exists() or not target.is_dir():
+                    return {'ok': False, 'error': 'path_not_found', 'path': str(target)}
+                cmd.extend(['--folder', str(target)])
+                log_dir = target
+            log_path = log_dir / f'translate_{int(time.time())}.log'
+            return _start_background_task(cmd, script.parent, log_path)
+
         return {'ok': False, 'error': 'unsupported_platform'}
     except Exception as exc:
         return {'ok': False, 'error': f'start_failed: {exc}'}
