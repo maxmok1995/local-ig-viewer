@@ -148,7 +148,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__'):
+        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
@@ -161,6 +161,8 @@ class QuietHandler(SimpleHTTPRequestHandler):
             elif self.path == '/__ig_download_status__':
                 pid = int(data.get('pid') or 0)
                 result = get_ig_download_status(pid)
+            elif self.path == '/__run_add_task__':
+                result = run_add_task(data)
             else:
                 result = run_ig_download(data)
             self._send_json(result, status=200 if result.get('ok') else 400)
@@ -274,6 +276,96 @@ def _resolve_ig_script() -> Path | None:
         if path.exists() and path.is_file():
             return path
     return None
+
+
+def _resolve_script(name: str) -> Path | None:
+    candidates = [
+        ROOT / name,
+        resolve_launch_dir() / name,
+        Path.cwd() / name,
+    ]
+    for path in candidates:
+        if path.exists() and path.is_file():
+            return path
+    return None
+
+
+def _start_background_task(cmd: list[str], cwd: Path, log_path: Path) -> dict[str, Any]:
+    with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
+        logf.write(f'\n=== launch {time.strftime("%Y-%m-%d %H:%M:%S")} ===\n')
+        logf.flush()
+        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        startupinfo = None
+        if hasattr(subprocess, 'STARTUPINFO'):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(cwd),
+            stdout=logf,
+            stderr=logf,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
+        )
+    IG_TASKS[proc.pid] = {'proc': proc, 'log': str(log_path)}
+    return {'ok': True, 'pid': proc.pid, 'cmd': cmd, 'log': str(log_path)}
+
+
+def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
+    platform = str(payload.get('platform') or '').strip().lower()
+    py_cmd = _resolve_python_cmd()
+    if py_cmd is None:
+        return {'ok': False, 'error': 'python_not_found'}
+    launch_dir = resolve_launch_dir()
+
+    try:
+        if platform == 'xhs':
+            user = str(payload.get('user') or '').strip()
+            output = str(payload.get('output') or '').strip()
+            count = int(payload.get('count') or 0)
+            cookie = str(payload.get('cookie') or '').strip()
+            if not user:
+                return {'ok': False, 'error': 'missing_user'}
+            if not output:
+                return {'ok': False, 'error': 'missing_output'}
+            out_path = Path(output)
+            if not out_path.is_absolute():
+                out_path = (launch_dir / out_path).resolve()
+            out_path.mkdir(parents=True, exist_ok=True)
+            script = _resolve_script('xhs_download.py')
+            if script is None:
+                return {'ok': False, 'error': 'xhs_script_not_found'}
+            cmd = [*py_cmd, str(script), user, '--output', str(out_path)]
+            if count > 0:
+                cmd.extend(['--count', str(count)])
+            if cookie:
+                cmd.extend(['--cookie', cookie])
+            log_path = out_path / f'xhs_download_{int(time.time())}.log'
+            return _start_background_task(cmd, script.parent, log_path)
+
+        if platform in ('flat', 'hhcat'):
+            folder = str(payload.get('path') or '').strip()
+            dry_run = bool(payload.get('dry_run'))
+            if not folder:
+                return {'ok': False, 'error': 'missing_path'}
+            target = Path(folder)
+            if not target.is_absolute():
+                target = (launch_dir / target).resolve()
+            if not target.exists() or not target.is_dir():
+                return {'ok': False, 'error': 'path_not_found', 'path': str(target)}
+            script_name = 'flat_convert.py' if platform == 'flat' else 'hhcat_convert.py'
+            script = _resolve_script(script_name)
+            if script is None:
+                return {'ok': False, 'error': f'{platform}_script_not_found'}
+            cmd = [*py_cmd, str(script), str(target)]
+            if dry_run:
+                cmd.append('--dry-run')
+            log_path = target / f'{platform}_convert_{int(time.time())}.log'
+            return _start_background_task(cmd, script.parent, log_path)
+
+        return {'ok': False, 'error': 'unsupported_platform'}
+    except Exception as exc:
+        return {'ok': False, 'error': f'start_failed: {exc}'}
 
 
 def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
