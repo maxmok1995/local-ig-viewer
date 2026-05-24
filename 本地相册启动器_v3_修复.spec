@@ -12,6 +12,7 @@ a = Analysis(
         ('xhs_download.py', '.'),
         ('flat_convert.py', '.'),
         ('hhcat_convert.py', '.'),
+        ('APP - deep-translator.py', '.'),
         ('VERSION', '.'),
     ],
     hiddenimports=[],

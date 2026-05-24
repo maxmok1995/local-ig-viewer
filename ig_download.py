@@ -335,8 +335,11 @@ def _resolve_user_id_by_username(ms, username: str) -> str:
 def _extract_mobile_items(ms, user_id: str, limit: int):
     items = []
     max_id = None
-    while len(items) < limit:
-        params = {'count': min(33, limit - len(items))}
+    # limit <= 0 means "fetch all available pages".
+    fetch_all = limit <= 0
+    while fetch_all or len(items) < limit:
+        batch_count = 33 if fetch_all else min(33, limit - len(items))
+        params = {'count': batch_count}
         if max_id:
             params['max_id'] = max_id
         data = _get_json_with_retry(
@@ -352,7 +355,7 @@ def _extract_mobile_items(ms, user_id: str, limit: int):
         max_id = data.get('next_max_id')
         if not max_id:
             break
-    return items[:limit]
+    return items if fetch_all else items[:limit]
 
 
 def _post_from_mobile_item(item):
@@ -397,7 +400,7 @@ def _post_from_mobile_item(item):
 
 
 # ── 主函数 ────────────────────────────────────────────────────────────────────
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description='Instagram 下载器，配合本地相册查看器 (local-ig.html) 使用',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -663,13 +666,13 @@ def main():
         if args.start is not None or args.end is not None:
             print("❌  降级模式暂不支持 --start/--end，请改用 --count")
             sys.exit(1)
-        if not args.count:
-            print("❌  降级模式需要 --count（建议 20）")
-            sys.exit(1)
         try:
             ms = _mobile_api_session(sid)
             uid = _resolve_user_id_by_username(ms, args.username)
-            raw_items = _extract_mobile_items(ms, uid, args.count)
+            mobile_limit = int(args.count or 0)
+            if mobile_limit <= 0:
+                print("ℹ️  降级模式：未指定 --count，尝试抓取全部可见帖子（可能较慢）")
+            raw_items = _extract_mobile_items(ms, uid, mobile_limit)
             posts = [_post_from_mobile_item(it) for it in raw_items]
             posts_iter = iter(posts)
             limit = len(posts)
@@ -679,6 +682,7 @@ def main():
             print("    请更换 sessionid 后重试")
             sys.exit(1)
     done = skip = fail = 0
+    incomplete = False
     i = 0
 
     while True:
@@ -710,6 +714,7 @@ def main():
                     print(f"\n⚠️  获取帖子列表失败（已重试 {RATE_LIMIT_RETRIES} 次）: {e}")
                     print(f"    已成功下载 {done} 条，请等待更长时间后重新运行脚本")
                     print(f"    ※ 已下载的帖子不会重复下载，直接重跑即可续传")
+                    incomplete = True
 
         if post is None:
             break
@@ -750,6 +755,8 @@ def main():
     print(f"\n{'─'*48}")
     print(f"  ✅  完成  下载 {done} | 已有 {skip} | 失败 {fail}")
     print(f"{'─'*48}")
+    if incomplete:
+        print("  ⚠️  本次未完整跑完目标列表（通常是限流或网络导致）")
     print(f"\n  📂  文件夹已自动打开: {resolved}")
     print(f"  🔗  {resolved.as_uri()}")
     print(f"\n  📱  在本地相册中查看:")
@@ -758,7 +765,12 @@ def main():
     print()
 
     open_folder(resolved)
+    if incomplete:
+        return 2
+    if fail > 0:
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

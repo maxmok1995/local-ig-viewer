@@ -8,9 +8,11 @@ import sys
 import shutil
 import zlib
 import time
+import threading
 import urllib.error
 import urllib.request
 import webbrowser
+from collections import deque
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,7 +24,7 @@ HOST = os.environ.get('LOCAL_IG_HOST', '127.0.0.1')
 LOCAL_IG_BOOTSTRAP_DIR = os.environ.get('LOCAL_IG_BOOTSTRAP_DIR', '本地IG')
 LOCAL_IG_ROLE_DIRS = ['角色1', '角色2']
 LOCAL_IG_OPENER_EXE_NAME = os.environ.get('LOCAL_IG_OPENER_EXE_NAME', '打开本地IG.exe')
-BOOTSTRAP_SYNC_FILES = ['ig_download.py', 'xhs_download.py', 'flat_convert.py', 'hhcat_convert.py', 'VERSION']
+BOOTSTRAP_SYNC_FILES = ['ig_download.py', 'xhs_download.py', 'flat_convert.py', 'hhcat_convert.py', 'APP - deep-translator.py', 'VERSION']
 STANDARD_SECOND_LEVEL_FOLDERS = [
     '人-合照', '人-摆拍', '人-自拍',
     '住-家', '住-旅店',
@@ -138,6 +140,13 @@ IG_TASKS: dict[int, dict[str, Any]] = {}
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         pass
+
+    def end_headers(self) -> None:
+        # Avoid stale frontend JS/HTML from browser cache during frequent local updates.
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
 
     def _send_json(self, data: dict[str, Any], status: int = 200) -> None:
         payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
@@ -259,10 +268,10 @@ def _resolve_python_cmd() -> list[str] | None:
     # Frozen launcher exe is not Python interpreter; prefer system python.
     py = shutil.which('python')
     if py:
-        return [py]
+        return [py, '-u']
     py_launcher = shutil.which('py')
     if py_launcher:
-        return [py_launcher, '-3']
+        return [py_launcher, '-3', '-u']
     return None
 
 
@@ -291,23 +300,47 @@ def _resolve_script(name: str) -> Path | None:
 
 
 def _start_background_task(cmd: list[str], cwd: Path, log_path: Path) -> dict[str, Any]:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
         logf.write(f'\n=== launch {time.strftime("%Y-%m-%d %H:%M:%S")} ===\n')
-        logf.flush()
-        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-        startupinfo = None
-        if hasattr(subprocess, 'STARTUPINFO'):
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(cwd),
-            stdout=logf,
-            stderr=logf,
-            creationflags=creationflags,
-            startupinfo=startupinfo,
-        )
-    IG_TASKS[proc.pid] = {'proc': proc, 'log': str(log_path)}
+        logf.write(f'cmd: {" ".join(cmd)}\n')
+    creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    startupinfo = None
+    if hasattr(subprocess, 'STARTUPINFO'):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding='utf-8',
+        errors='ignore',
+        bufsize=1,
+        creationflags=creationflags,
+        startupinfo=startupinfo,
+    )
+    tail_buf: deque[str] = deque(maxlen=120)
+    tail_lock = threading.Lock()
+
+    def _pump_output() -> None:
+        try:
+            with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
+                if proc.stdout is None:
+                    return
+                for line in proc.stdout:
+                    text = line.rstrip('\r\n')
+                    logf.write(line)
+                    logf.flush()
+                    if text:
+                        with tail_lock:
+                            tail_buf.append(text)
+        except Exception:
+            return
+
+    threading.Thread(target=_pump_output, daemon=True).start()
+    IG_TASKS[proc.pid] = {'proc': proc, 'log': str(log_path), 'tail_buf': tail_buf, 'tail_lock': tail_lock}
     return {'ok': True, 'pid': proc.pid, 'cmd': cmd, 'log': str(log_path)}
 
 
@@ -444,23 +477,10 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
 
     try:
         log_path = out_path / f'ig_download_{username}.log'
-        with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
-            logf.write(f'\n=== launch {time.strftime("%Y-%m-%d %H:%M:%S")} ===\n')
-            logf.flush()
-            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-            startupinfo = None
-            if hasattr(subprocess, 'STARTUPINFO'):
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
-            proc = subprocess.Popen(
-                cmd,
-                cwd=str(script.parent),
-                stdout=logf,
-                stderr=logf,
-                creationflags=creationflags,
-                startupinfo=startupinfo,
-            )
-        IG_TASKS[proc.pid] = {'proc': proc, 'log': str(log_path)}
+        started = _start_background_task(cmd, script.parent, log_path)
+        if not started.get('ok'):
+            return started
+        proc = IG_TASKS[int(started['pid'])]['proc']
         time.sleep(0.8)
         ret = proc.poll()
         if ret is not None:
@@ -476,7 +496,7 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
             return {'ok': False, 'error': msg, 'cmd': cmd, 'log': str(log_path)}
         return {
             'ok': True,
-            'pid': proc.pid,
+            'pid': int(started['pid']),
             'cmd': cmd,
             'script': str(script),
             'log': str(log_path),
@@ -494,9 +514,17 @@ def get_ig_download_status(pid: int) -> dict[str, Any]:
     code = proc.poll()
     tail = ''
     try:
+        tail_buf = task.get('tail_buf')
+        tail_lock = task.get('tail_lock')
+        if tail_buf is not None and tail_lock is not None:
+            with tail_lock:
+                recent = list(tail_buf)[-20:]
+            if recent:
+                tail = '\n'.join(recent)
         if log_path.exists():
-            text = log_path.read_text(encoding='utf-8', errors='ignore')
-            tail = '\n'.join(text.splitlines()[-20:])
+            if not tail:
+                text = log_path.read_text(encoding='utf-8', errors='ignore')
+                tail = '\n'.join(text.splitlines()[-20:])
     except Exception:
         tail = ''
     return {

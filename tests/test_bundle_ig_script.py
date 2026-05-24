@@ -15,6 +15,12 @@ class BundleIgScriptTest(unittest.TestCase):
     def test_bootstrap_sync_includes_ig_download_script(self):
         self.assertIn("BOOTSTRAP_SYNC_FILES = ['ig_download.py'", self.py)
 
+    def test_spec_includes_translator_script(self):
+        self.assertIn("('APP - deep-translator.py', '.')", self.spec)
+
+    def test_bootstrap_sync_includes_translator_script(self):
+        self.assertIn("'APP - deep-translator.py'", self.py)
+
 
 if __name__ == '__main__':
     unittest.main()

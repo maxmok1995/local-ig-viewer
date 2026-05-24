@@ -5348,7 +5348,8 @@ $('igRunBtn').addEventListener('click',async()=>{
   const dir=getHtmlDir();
   const effectiveOutput=checked.value||(dir?`${dir}/downloads`:'downloads');
   const sid=sanitizeSessionId(($('igSessionId')?.value||''));
-  const count=guessCountFromUI();
+  const rawCount=guessCountFromUI();
+  const count=(rawCount&&parseInt(rawCount,10)>0)?parseInt(rawCount,10):0;
   const payload={
     username,
     output:effectiveOutput,
@@ -5373,6 +5374,7 @@ $('igRunBtn').addEventListener('click',async()=>{
     }
     const authTip=sid?'sessionid':'cookies-from-browser';
     $('igRunStatus').textContent=`✅ 已启动下载任务（PID ${data.pid||'-'}，认证方式：${authTip}）`;
+    if(!(rawCount&&parseInt(rawCount,10)>0)) toast('未指定数量，将下载全部（可能较慢）',2200);
     toast('已启动下载任务，正在同步运行结果…');
     if(data.pid){
       const poll=async()=>{
@@ -5387,8 +5389,17 @@ $('igRunBtn').addEventListener('click',async()=>{
             $('igRunStatus').textContent=`❌ 任务状态查询失败：${s.error||('HTTP '+r.status)}`;
             return;
           }
+          const tailLines=String(s.tail||'').split('\n').map(v=>v.trim()).filter(Boolean);
+          const latestLine=tailLines.length?tailLines[tailLines.length-1]:'';
+          let progressNm='';
+          for(let i=tailLines.length-1;i>=0;i--){
+            const m=tailLines[i].match(/\[(\d+)\s*\/\s*(\d+|\?)\]/);
+            if(m){ progressNm=`${m[1]}/${m[2]}`; break; }
+          }
           if(s.running){
-            $('igRunStatus').textContent=`⏳ 下载进行中（PID ${s.pid}）`;
+            const left=progressNm?`⏳ 下载进行中（${progressNm}）`:`⏳ 下载进行中（PID ${s.pid}）`;
+            const progressLine=latestLine?` | ${latestLine.slice(0,80)}`:'';
+            $('igRunStatus').textContent=`${left}${progressLine}`;
             setTimeout(poll,2000);
             return;
           }
@@ -5396,7 +5407,7 @@ $('igRunBtn').addEventListener('click',async()=>{
             $('igRunStatus').textContent=`✅ 下载完成（PID ${s.pid}）`;
             toast('IG 下载完成');
           }else{
-            const tail=(s.tail||'').split('\\n').slice(-2).join(' | ');
+            const tail=(s.tail||'').split('\n').slice(-2).join(' | ');
             $('igRunStatus').textContent=`❌ 下载失败（退出码 ${s.exit_code}）${tail?`：${tail}`:''}`;
             toast('IG 下载失败，请查看日志');
           }
@@ -5538,10 +5549,11 @@ $('igSessionId').addEventListener('input',()=>{
     const n=chip?chip.dataset.n:'';
     const outPath=S.rootAbsPath||'downloads';
     const sid=sanitizeSessionId(($('igSessionId')?.value||''));
+    const safeCount=(n&&parseInt(n,10)>0)?parseInt(n,10):0;
     return {
       username:user,
       output:outPath,
-      count:(n&&parseInt(n,10)>0)?parseInt(n,10):0,
+      count:safeCount,
       sessionid:sid,
       use_cookies_from_browser:!sid,
     };
@@ -5606,7 +5618,17 @@ $('igSessionId').addEventListener('input',()=>{
           });
           const s=await r.json().catch(()=>({ok:false,error:'bad_json'}));
           if(!r.ok||!s.ok){ cmdEl.textContent=`❌ 状态查询失败：${s?.error||('HTTP '+r.status)}`; return; }
-          if(s.running){ cmdEl.textContent=`⏳ 下载进行中（PID ${s.pid}）`; setTimeout(poll,2000); return; }
+          if(s.running){
+            const tailLines=String(s.tail||'').split('\n').map(v=>v.trim()).filter(Boolean);
+            let progressNm='';
+            for(let i=tailLines.length-1;i>=0;i--){
+              const m=tailLines[i].match(/\[(\d+)\s*\/\s*(\d+|\?)\]/);
+              if(m){ progressNm=`${m[1]}/${m[2]}`; break; }
+            }
+            cmdEl.textContent=progressNm?`⏳ 下载进行中（${progressNm}）`:`⏳ 下载进行中（PID ${s.pid}）`;
+            setTimeout(poll,2000);
+            return;
+          }
           if((s.exit_code||0)===0) cmdEl.textContent='✅ 下载完成，请刷新相册';
           else{
             const tail=(s.tail||'').split('\n').slice(-4).join(' | ');
@@ -5823,12 +5845,13 @@ lbCaption.addEventListener('input',()=>{
     const user=$('igAddUser').value.trim().replace(/^@/,'');
     if(!user){$('igAddUser')?.focus();return;}
     const n=getCount();
+    const safeCount=(n&&parseInt(n,10)>0)?parseInt(n,10):0;
     const sidRaw=(localStorage.getItem('ig-session-id')||'');
     const sid=(typeof sanitizeSessionId==='function')?sanitizeSessionId(sidRaw):sidRaw.trim();
     const payload={
       username:user,
       output:getOutPath(),
-      count:(n&&parseInt(n,10)>0)?parseInt(n,10):0,
+      count:safeCount,
       sessionid:sid,
       use_cookies_from_browser:!sid,
     };
@@ -5848,6 +5871,9 @@ lbCaption.addEventListener('input',()=>{
       igTaskPid=data.pid||0;
       const authTip=sid?'sessionid':'cookies-from-browser';
       cmdEl.textContent=`✅ 已啟動任務（PID ${igTaskPid||'-'}，認證：${authTip}）`;
+      if(!(n&&parseInt(n,10)>0)){
+        toast('未指定数量，将下载全部（可能较慢）',2200);
+      }
       pollTaskStatus(igTaskPid);
     }catch(e){
       cmdEl.textContent=`❌ 啟動失敗：${e.message||e}`;
