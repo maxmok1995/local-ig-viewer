@@ -380,8 +380,27 @@ input[type=file]{display:none}
 }
 .tagEditor{
   display:flex;flex-wrap:wrap;align-items:center;gap:6px;
-  padding:9px 14px;border-bottom:1px solid var(--border);
-  background:var(--s1);min-height:42px;
+  padding:7px 14px;border-bottom:1px solid var(--border);
+  background:var(--s1);min-height:34px;
+}
+.tagBucket{
+  min-width:0;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:6px 8px;
+  background:rgba(255,255,255,.01);
+}
+.tagBucketHead{
+  font-size:11px;
+  opacity:.55;
+  margin-bottom:5px;
+  user-select:none;
+}
+.tagBucketBody{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-height:20px;
 }
 .tagChip{
   display:inline-flex;align-items:center;gap:2px;
@@ -405,6 +424,33 @@ input[type=file]{display:none}
   padding:6px 14px;border-bottom:1px solid var(--border);
   background:var(--s1);
 }
+.tagAddRowSplit{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:6px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--s1);
+}
+.tagAddPane{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+}
+.tagAddPaneHead{
+  font-size:11px;
+  opacity:.55;
+  margin-right:4px;
+  flex-shrink:0;
+}
+.tagFolderInput{
+  flex:1;min-width:80px;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:999px;padding:6px 10px;
+  font-size:12px;color:var(--text);outline:none;
+}
+.tagFolderInput:focus{border-color:#555}
 .tagL1Input,.tagL2Input{
   flex:1;min-width:60px;max-width:160px;
   background:var(--s2);border:1px solid var(--border);
@@ -2186,6 +2232,79 @@ const STANDARD_SECOND_LEVEL_FOLDERS=[
   '行-出海','行-地铁','行-自驾','行-航班',
 ];
 const preferredFolderCategoryOrder=['人','工作','吃喝','行','住','玩乐','备忘'];
+const FOLDER_L1_CORES = new Set([
+  '人', '工作', '吃喝', '行', '住', '玩乐', '玩樂', '备忘', '備忘', '未分类', '未分類'
+]);
+function normalizeTagCore(tag){
+  const s=String(tag||'').trim();
+  // 去除前导的 emoji 装饰等，保留文字核心
+  return s.replace(/^[^A-Za-z0-9\u4e00-\u9fff]+/u,'').trim();
+}
+function isBlockedOtherL1Option(tag){
+  const v=String(tag||'').trim();
+  if(!v) return true;
+  const core=normalizeTagCore(v);
+  
+  // 1) 检查是否直接是文件夹一级大类
+  if(FOLDER_L1_CORES.has(core)) return true;
+  
+  // 2) 检查是否是带连字符的二级大类（如 吃喝-晚，人-合照）
+  const dashIndex=core.indexOf('-');
+  if(dashIndex > 0){
+    const prefix=core.slice(0, dashIndex).trim();
+    if(FOLDER_L1_CORES.has(prefix)) return true;
+  }
+  
+  // 3) 检查是否是带斜杠的复合标签（如 吃喝/吃喝-晚）
+  const slashIndex=core.indexOf('/');
+  if(slashIndex > 0){
+    const prefix=core.slice(0, slashIndex).trim();
+    if(FOLDER_L1_CORES.has(prefix)) return true;
+  }
+
+  // 4) 兜底：如果与任何文件夹一级分类相等，或是以其开头
+  for (const coreName of FOLDER_L1_CORES) {
+    if (core === coreName || core.startsWith(coreName + '-') || core.startsWith(coreName + '/')) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+function isFolderCategoryTag(tag){
+  const v=String(tag||'').trim();
+  if(!v) return false;
+  if(isStandardSecondLevelFolderTag(v)) return true;
+  const canonical=new Set();
+  STANDARD_SECOND_LEVEL_FOLDERS.forEach(ft=>{
+    buildCanonicalFolderCategoryTags(ft).forEach(t=>canonical.add(String(t||'').trim()));
+  });
+  return canonical.has(v);
+}
+function isManagedCategoryTag(tag){
+  const v=String(tag||'').trim();
+  if(!v) return false;
+  if(isFolderCategoryTag(v)) return true;
+  
+  const hierarchyL1s = new Set();
+  TAG_HIERARCHY.forEach(g => {
+    for (const val of Object.values(g.l1)) {
+      hierarchyL1s.add(val);
+      hierarchyL1s.add(normalizeTagCore(val));
+    }
+  });
+  
+  const vCore=normalizeTagCore(v);
+  if(hierarchyL1s.has(v) || hierarchyL1s.has(vCore)) return true;
+  
+  const sl=v.indexOf('/');
+  if(sl!==-1){
+    const l1=v.slice(0,sl).trim();
+    const l1Core=normalizeTagCore(l1);
+    if(hierarchyL1s.has(l1) || hierarchyL1s.has(l1Core)) return true;
+  }
+  return false;
+}
 function getFolderCategoryGroupsForToggle(){
   const preferred=new Set(preferredFolderCategoryOrder);
   return buildFolderDefaultCategoryGroups().filter(group=>preferred.has(tagName(group.l1)));
@@ -4005,10 +4124,16 @@ function buildCard(alb,idx,total){
   if(alb.coverUrl){
     const coverSrc=alb.firstImage||(alb.photos.find(p=>!p.isVideo))||alb.photos[0];
     if(coverSrc?.isVideo){
-      const vid=document.createElement('video');
-      vid.src=alb.coverUrl;vid.preload='metadata';vid.muted=true;vid.playsInline=true;
-      vid.addEventListener('loadedmetadata',()=>{ vid.currentTime=0.01; });
-      card.appendChild(vid);
+      if(coverSrc.poster?.file){
+        if(!coverSrc.poster.url) coverSrc.poster.url=URL.createObjectURL(coverSrc.poster.file);
+        const img=document.createElement('img');img.src=coverSrc.poster.url;img.loading='lazy';
+        card.appendChild(img);
+      }else{
+        const vid=document.createElement('video');
+        vid.src=alb.coverUrl;vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.autoplay=true;vid.loop=true;
+        vid.addEventListener('loadedmetadata',()=>{ try{vid.currentTime=0.01;}catch{} });
+        card.appendChild(vid);
+      }
     } else {
       const img=document.createElement('img');img.src=alb.coverUrl;img.loading='lazy';
       card.appendChild(img);
@@ -4172,7 +4297,7 @@ function renderHomePhotoGrid(container){
           card.appendChild(img);
         } else {
           const vid=document.createElement('video');
-          vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.disablePictureInPicture=true;
+          vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.disablePictureInPicture=true;vid.autoplay=true;vid.loop=true;
           const obs=new IntersectionObserver(e=>{
             if(e[0].isIntersecting){
               if(!photo.url) photo.url=URL.createObjectURL(photo.file);
@@ -4587,7 +4712,6 @@ function renderTagEditor(alb, container){
 
   function refreshSug(){
     while(sugRow.children.length>1) sugRow.removeChild(sugRow.lastChild);
-    // 從有效 hierarchy 收集所有 L1 標籤（含自定義 + 已改名）
     const hierarchyL1=getEffectiveHierarchy().map(g=>tagName(g.l1));
     const remaining=[...autoDetectTags(alb),...getQuickTags(),...hierarchyL1]
       .filter((s,i,a)=>a.indexOf(s)===i)
@@ -4617,7 +4741,6 @@ function renderTagEditor(alb, container){
         if(tag.includes('/')){
           removeTag(alb,tag);
         } else {
-          // 刪除 L1 時同時刪除所有子 L2
           alb.tags=(alb.tags||[]).filter(t=>t!==tag&&!t.startsWith(tag+'/'));
           store.setAlbum(alb.name,{tags:alb.tags});
           scheduleWrite(alb);
@@ -4637,19 +4760,26 @@ function renderTagEditor(alb, container){
     });
   }
 
-  // ── 兩欄輸入行 ───────────────────────────────────────────────────────────
-  const addRow=document.createElement('div');addRow.className='tagAddRow';
+  const addRow=document.createElement('div');addRow.className='tagAddRowSplit';
+  const leftPane=document.createElement('div');leftPane.className='tagAddPane';
+  const rightPane=document.createElement('div');rightPane.className='tagAddPane';
+  const leftHead=document.createElement('span');leftHead.className='tagAddPaneHead';leftHead.textContent='文件夹标签';
+  const rightHead=document.createElement('span');rightHead.className='tagAddPaneHead';rightHead.textContent='添加其他';
 
-  // datalist 元素
+  const dlFolder=document.createElement('datalist');dlFolder.id='_tfolderdl';
   const dl1=document.createElement('datalist');dl1.id='_tl1dl';
   const dl2=document.createElement('datalist');dl2.id='_tl2dl';
 
-  // L1 輸入框
+  const folderInp=document.createElement('input');
+  folderInp.className='tagFolderInput';folderInp.placeholder='如：住-旅店';
+  folderInp.setAttribute('list','_tfolderdl');
+  const addFolderBtn=document.createElement('button');addFolderBtn.className='tagAddBtn';
+  addFolderBtn.textContent='+';addFolderBtn.type='button';
+
   const l1Inp=document.createElement('input');
   l1Inp.className='tagL1Input';l1Inp.placeholder='L1 分類…';
   l1Inp.setAttribute('list','_tl1dl');
 
-  // L2 輸入框
   const l2Inp=document.createElement('input');
   l2Inp.className='tagL2Input';l2Inp.placeholder='L2 子項（可選）';
   l2Inp.setAttribute('list','_tl2dl');
@@ -4659,18 +4789,48 @@ function renderTagEditor(alb, container){
   const addBtn=document.createElement('button');addBtn.className='tagAddBtn';
   addBtn.textContent='+';addBtn.type='button';
 
-  // 填充 L1 候選列表
-  const fillL1=()=>{
-    dl1.innerHTML='';
-    const l1s=new Set(getEffectiveHierarchy().map(g=>tagName(g.l1)));
-    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
-      const sl=tag.indexOf('/');
-      l1s.add(sl===-1?tag:tag.slice(0,sl));
-    }));
-    l1s.forEach(v=>{const o=document.createElement('option');o.value=v;dl1.appendChild(o);});
+  const fillFolder=()=>{
+    dlFolder.innerHTML='';
+    const set=new Set();
+    getEffectiveHierarchy().forEach(g=>{
+      (g.children||[]).forEach(c=>{
+        const tag=`${tagName(g.l1)}-${tagName(c.l2)}`;
+        if(isStandardSecondLevelFolderTag(tag)) set.add(tag);
+      });
+    });
+    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{ if(isStandardSecondLevelFolderTag(tag)) set.add(tag); }));
+    [...set].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).forEach(v=>{
+      const o=document.createElement('option');o.value=v;dlFolder.appendChild(o);
+    });
   };
 
-  // 根據已選 L1 更新 L2 候選列表
+  const fillL1=()=>{
+    l1Inp.placeholder='L1分类_V2.2…';
+    dl1.innerHTML='';
+    const l1s=new Set();
+    
+    // 1) 收集系统内置的非文件夹分类大类
+    getEffectiveHierarchy().forEach(g=>{
+      const n=tagName(g.l1);
+      if(!isBlockedOtherL1Option(n)){
+        l1s.add(n);
+      }
+    });
+
+    // 2) 收集所有相册中已用标签的非文件夹分类大类
+    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
+      const sl=tag.indexOf('/');
+      const v=sl===-1?tag:tag.slice(0,sl);
+      if(!isBlockedOtherL1Option(v)){
+        l1s.add(v);
+      }
+    }));
+
+    [...l1s].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).forEach(v=>{
+      const o=document.createElement('option');o.value=v;dl1.appendChild(o);
+    });
+  };
+
   const fillL2=()=>{
     const l1v=l1Inp.value.trim();
     l2Inp.disabled=!l1v;
@@ -4682,7 +4842,7 @@ function renderTagEditor(alb, container){
     S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
       if(!tag.startsWith(l1v+'/')) return;
       const l2part=tag.slice(l1v.length+1);
-      if(!l2part.includes('/')) l2s.add(l2part); // 排除 L3，其餘都顯示
+      if(!l2part.includes('/')) l2s.add(l2part);
     }));
     l2s.forEach(v=>{const o=document.createElement('option');o.value=v;dl2.appendChild(o);});
   };
@@ -4690,33 +4850,47 @@ function renderTagEditor(alb, container){
   l1Inp.addEventListener('input',fillL2);
   l1Inp.addEventListener('change',fillL2);
 
+  const doAddFolder=async()=>{
+    const v=folderInp.value.trim();
+    if(!v) return;
+    if(await setPrimaryFolderCategoryTag(alb,v)){
+      folderInp.value='';
+      rebuildArea();refreshSug();refreshCurrentAlbumView(alb);
+    }
+  };
+
   const doAdd=async()=>{
     const l1v=l1Inp.value.trim();
     if(!l1v) return;
     const l2v=l2Inp.value.trim();
     const folderCandidate = l2v || l1v;
+    
+    // 如果属于核心文件夹大类，阻断并提示在左侧输入
+    if(isBlockedOtherL1Option(l1v) || isManagedCategoryTag(l1v) || (l2v && isManagedCategoryTag(l2v)) || isStandardSecondLevelFolderTag(folderCandidate)){
+      toast('此处仅添加其他标签；文件夹标签请用左侧输入',2200);
+      return;
+    }
+
     let changed=false;
-    if(isStandardSecondLevelFolderTag(folderCandidate)){
-      if(await setPrimaryFolderCategoryTag(alb, folderCandidate)) changed=true;
-    } else if(addTag(alb,l1v)) changed=true;
-    if(l2v && !isStandardSecondLevelFolderTag(folderCandidate) && addTag(alb,`${l1v}/${l2v}`)) changed=true;
+    if(addTag(alb,l1v)) changed=true;
+    if(l2v && addTag(alb,`${l1v}/${l2v}`)) changed=true;
     if(changed){
       l1Inp.value='';l2Inp.value='';l2Inp.disabled=true;
       rebuildArea();refreshSug();refreshCurrentAlbumView(alb);
     }
   };
 
-  // Enter 在 L1：若 L2 可用則跳到 L2，否則直接提交
-  l1Inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();l2Inp.disabled?void doAdd():l2Inp.focus();}
-  });
-  l2Inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();void doAdd();}
-  });
+  folderInp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();void doAddFolder();} });
+  addFolderBtn.addEventListener('click',()=>void doAddFolder());
+  l1Inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();l2Inp.disabled?void doAdd():l2Inp.focus();} });
+  l2Inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();void doAdd();} });
   addBtn.addEventListener('click',()=>void doAdd());
 
+  fillFolder();
   fillL1();
-  addRow.append(dl1,dl2,l1Inp,sep,l2Inp,addBtn);
+  leftPane.append(leftHead,dlFolder,folderInp,addFolderBtn);
+  rightPane.append(rightHead,dl1,dl2,l1Inp,sep,l2Inp,addBtn);
+  addRow.append(leftPane,rightPane);
 
   container.appendChild(area);
   container.appendChild(addRow);
@@ -4724,7 +4898,6 @@ function renderTagEditor(alb, container){
   rebuildArea();
   refreshSug();
 }
-
 // ── Render: Album feed ────────────────────────────────────────────────────
 function renderAlbum(alb){
   const el=$('vAlbum'); el.innerHTML=''; el.scrollTop=0;
@@ -6431,17 +6604,50 @@ function renderAlbumGrid(alb){
     const imgWrap=document.createElement('div');
     imgWrap.className='gridImgWrap';
 
-    const img=document.createElement('img');
-    img.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
-    const obs=new IntersectionObserver(e=>{
-      if(e[0].isIntersecting){
-        const src=photo.isVideo&&photo.poster?photo.poster:photo;
-        if(!src.url) src.url=URL.createObjectURL(src.file);
-        img.src=src.url;obs.disconnect();
-      }
-    },{rootMargin:'200px'});
-    obs.observe(img);
-    imgWrap.appendChild(img);
+    if(photo.isVideo && !photo.poster){
+      const img=document.createElement('img');
+      img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;background:#111';
+      const obs=new IntersectionObserver(e=>{
+        if(e[0].isIntersecting){
+          if(photo.thumbUrl){ img.src=photo.thumbUrl; obs.disconnect(); return; }
+          if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+          const v=document.createElement('video');
+          v.preload='metadata'; v.muted=true; v.playsInline=true; v.src=photo.url;
+          const done=()=>{ try{ v.src=''; }catch{} };
+          v.addEventListener('loadeddata',()=>{
+            try{
+              const c=document.createElement('canvas');
+              c.width=Math.max(1,v.videoWidth||320);
+              c.height=Math.max(1,v.videoHeight||180);
+              const ctx=c.getContext('2d');
+              if(ctx){
+                ctx.drawImage(v,0,0,c.width,c.height);
+                photo.thumbUrl=c.toDataURL('image/jpeg',0.82);
+                img.src=photo.thumbUrl;
+              }
+            }catch{}
+            done();
+          },{once:true});
+          v.addEventListener('error',done,{once:true});
+          try{ v.currentTime=0.05; }catch{}
+          obs.disconnect();
+        }
+      },{rootMargin:'200px'});
+      obs.observe(img);
+      imgWrap.appendChild(img);
+    }else{
+      const img=document.createElement('img');
+      img.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
+      const obs=new IntersectionObserver(e=>{
+        if(e[0].isIntersecting){
+          const src=photo.isVideo&&photo.poster?photo.poster:photo;
+          if(!src.url) src.url=URL.createObjectURL(src.file);
+          img.src=src.url;obs.disconnect();
+        }
+      },{rootMargin:'200px'});
+      obs.observe(img);
+      imgWrap.appendChild(img);
+    }
 
     // 移动按钮
     const mvBtn=document.createElement('button');
@@ -6649,6 +6855,16 @@ function openLocalFolder(alb){
   const finalPath=isWin?path.replace(/\//g,'\\'):path;
   requestOpenFolderViaServer(finalPath).then(ok=>{
     if(ok) return;
+    let opened=false;
+    try{
+      const fileUrl=`file:///${finalPath.replace(/\\/g,'/')}`;
+      const w=window.open(fileUrl,'_blank');
+      opened=!!w;
+    }catch{}
+    if(opened){
+      toast(t('explorerOpenOk')||'已打開資料夾',2200);
+      return;
+    }
     navigator.clipboard.writeText(finalPath).then(()=>toast(t('folderCopied'),3500)).catch(()=>{
       const inp=document.createElement('input');
       inp.style.cssText='position:fixed;top:-999px;opacity:0';
@@ -7150,6 +7366,7 @@ $('batchDelete').addEventListener('click',()=>{
 </script>
 </body>
 </html>
+
 
 
 
