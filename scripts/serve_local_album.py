@@ -540,7 +540,7 @@ def get_ig_download_status(pid: int) -> dict[str, Any]:
 def main() -> int:
     launch_dir = resolve_launch_dir()
     exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else ''
-    is_installer_mode = exe_name == '安装本地IG.exe'
+    is_installer_mode = exe_name in ('安装本地IG.exe', 'IG.exe')
     # Keep runtime helper scripts up to date even when running secondary exe in 本地IG.
     if launch_dir.name == LOCAL_IG_BOOTSTRAP_DIR:
         sync_runtime_files_to_dir(launch_dir)
