@@ -12,7 +12,7 @@ class FolderDefaultCategoriesTest(unittest.TestCase):
         required_patterns = [
             r'defaultFolderCategories\s*:\s*\[\]',
             r'function\s+buildFolderDefaultCategoryGroups\s*\(',
-            r'S\.defaultFolderCategories\s*=\s*\[\.\.\.new Set\(subDirs\.map\(d=>d\.name\)\.filter\(Boolean\)\)\]',
+            r'S\.defaultFolderCategories\s*=\s*\[\.\.\.new Set\(detectedCategories\)\].*',
         ]
         for pattern in required_patterns:
             self.assertIsNotNone(re.search(pattern, self.html, flags=re.S), msg=pattern)

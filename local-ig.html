@@ -2180,6 +2180,16 @@ const store = {
 };
 
 // ── Tag helpers ───────────────────────────────────────────────────────────
+function matchKeyword(text, kw) {
+  kw = kw.toLowerCase();
+  if (/^[a-z0-9\s'-]+$/i.test(kw)) {
+    // 匹配完整的西文单词，避免 eat 误碰 great 等子字符串误触发问题
+    const escaped = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const rx = new RegExp('\\b' + escaped + '\\b', 'i');
+    return rx.test(text);
+  }
+  return text.includes(kw);
+}
 function autoDetectTags(alb){
   const text=((alb.desc||'')+' '+(alb.title||'')+' '+(alb.location||'')).toLowerCase();
   const loc=(alb.location||'').toLowerCase();
@@ -2189,11 +2199,11 @@ function autoDetectTags(alb){
     const l1=tagName(group.l1);
 
     // L1 關鍵字匹配
-    if(group.kw.some(kw=>text.includes(kw))) tags.add(l1);
+    if(group.kw.some(kw=>matchKeyword(text, kw))) tags.add(l1);
 
     // L2 子項匹配
     for(const child of (group.children||[])){
-      if(child.kw.some(kw=>text.includes(kw))){
+      if(child.kw.some(kw=>matchKeyword(text, kw))){
         tags.add(l1);
         tags.add(`${l1}/${tagName(child.l2)}`);
       }
@@ -2202,7 +2212,7 @@ function autoDetectTags(alb){
     // 旅行：通過 COUNTRY_MAP 偵測國家 → L2
     if(group._useCountryMap){
       for(const entry of COUNTRY_MAP){
-        if(entry.kw.some(kw=>loc.includes(kw)||text.includes(kw))){
+        if(entry.kw.some(kw=>matchKeyword(loc, kw)||matchKeyword(text, kw))){
           tags.add(l1);
           tags.add(`${l1}/${tagName(entry)}`);
           break;
@@ -2952,7 +2962,7 @@ async function readFolder(root){
   }
 
   // 处理子目录（每个子目录独立 try-catch，一个失败不影响其他）
-  S.defaultFolderCategories=[...new Set(subDirs.map(d=>d.name).filter(Boolean))];
+  const detectedCategories=[];
   for(const {name,h} of subDirs){
     try{
       const kind=await classifyDir(h);
@@ -2961,6 +2971,7 @@ async function readFolder(root){
         const {photos,postMeta,firstImage,notesData,_corruptMeta}=await readPhotosFromDir(h);
         if(photos.length) albumRecords.push(createAlbumIndexRecord({name,handle:h,photos,postMeta,firstImage,notesData,_corruptMeta}));
       } else if(kind==='category'){
+        detectedCategories.push(name);
         // 分类文件夹：遍历子文件夹，外层名作为 L1 inheritTag
         // 若子文件夹本身也是 category（L2），再向下一层扫描帖子
         try{
@@ -2972,6 +2983,7 @@ async function readFolder(root){
                 const {photos,postMeta,firstImage,notesData,_corruptMeta}=await readPhotosFromDir(subH);
                 if(photos.length) albumRecords.push(createAlbumIndexRecord({name:subName,handle:subH,photos,postMeta,firstImage,notesData,_corruptMeta,_inheritTags:[name],_folderRelPath:`${name}/${subName}`}));
               } else if(subKind==='category'){
+                detectedCategories.push(subName.includes('-') ? subName : `${name}-${subName}`);
                 // L2 分类文件夹：帖子继承 [L1, L2]
                 try{
                   for await(const [subSubName,subSubH] of subH.entries()){
@@ -3027,6 +3039,7 @@ async function readFolder(root){
     albumRecords.unshift(createAlbumIndexRecord({name:'__root__',handle:null,photos:rootPhotos,postMeta:null,rootAlbum:true,firstImage:rootLooseImgs[0]||null,notesData:rootNotesData}));
   }
 
+  S.defaultFolderCategories=[...new Set(detectedCategories)].length ? [...new Set(detectedCategories)] : [...STANDARD_SECOND_LEVEL_FOLDERS];
   const snapshot = buildRootIndexSnapshot(root, albumRecords);
   await writeRootIndexSnapshot(root, snapshot);
   const albums = await materializeAlbumsFromIndexRecords(albumRecords, root.name);
@@ -3357,8 +3370,17 @@ function getFilteredAlbums(){
     });
   }
   if(S.activeLocation) result=result.filter(alb=>alb.location===S.activeLocation);
-  if(S.mediaFilter==='video') result=result.filter(isVideoAlbum);
-  else if(S.mediaFilter==='photo') result=result.filter(alb=>!isVideoAlbum(alb));
+  if(S.mediaFilter==='video'){
+    result=result.filter(alb=>{
+      if(S.homePreviewMode==='photos') return alb.photos.some(p=>p.isVideo);
+      return isVideoAlbum(alb);
+    });
+  } else if(S.mediaFilter==='photo'){
+    result=result.filter(alb=>{
+      if(S.homePreviewMode==='photos') return alb.photos.some(p=>!p.isVideo);
+      return !isVideoAlbum(alb);
+    });
+  }
   return [...result].sort((a,b)=>{
     if(S.sortMode==='date-desc') return getAlbumDate(b)-getAlbumDate(a);
     if(S.sortMode==='date-asc')  return getAlbumDate(a)-getAlbumDate(b);
@@ -4268,7 +4290,12 @@ function renderHomePhotoGrid(container){
   const filtered=getFilteredAlbums();
   const itemsByAlbum=new Map();
   filtered.forEach(alb=>{
-    itemsByAlbum.set(alb.name, alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover).map((photo,photoIdx)=>({alb,photo,photoIdx})));
+    itemsByAlbum.set(alb.name, alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover).filter(photo => {
+      if (S.mediaFilter === 'video' && !photo.isVideo) return false;
+      if (S.mediaFilter === 'photo' && photo.isVideo) return false;
+      return true;
+    }).map((photo,photoIdx,arr)=>({alb,photo,photoIdx,totalVisible:arr.length})));
+    if(!itemsByAlbum.get(alb.name).length) itemsByAlbum.delete(alb.name);
   });
   if(!itemsByAlbum.size){
     container.innerHTML=`<div class="empty">${t('noTagResult')}</div>`;return;
@@ -4277,6 +4304,7 @@ function renderHomePhotoGrid(container){
     const group=document.createElement('div');group.className='homePhotoGroup';
     const groupTitle=document.createElement('div');groupTitle.className='homePhotoGroupTitle';
     const alb=items[0].alb;
+    const totalVisible = items[0].totalVisible;
     const visiblePhotos=alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover);
     groupTitle.textContent=`${alb.title||albName} · ${items.length} ${t('previewPhotos')}`;
     group.appendChild(groupTitle);
@@ -4326,13 +4354,13 @@ function renderHomePhotoGrid(container){
 
       const ov=document.createElement('div');ov.className='overlay';
       const posEl=document.createElement('div');posEl.className='cardPos';
-      posEl.textContent=`${photoIdx+1} / ${visiblePhotos.length}`;
+      posEl.textContent=`${photoIdx+1} / ${totalVisible}`;
       ov.appendChild(posEl);
       const aName=document.createElement('div');aName.className='aName';
       if(S.searchQuery){aName.innerHTML=hlText(alb.title,S.searchQuery);} else {aName.textContent=alb.title;}
       ov.appendChild(aName);
       const metaEl=document.createElement('div');metaEl.className='homePhotoMeta';
-      metaEl.textContent=t('previewPhotoIndex')(photoIdx+1,visiblePhotos.length);
+      metaEl.textContent=t('previewPhotoIndex')(photoIdx+1,totalVisible);
       ov.appendChild(metaEl);
       card.appendChild(ov);
       card.addEventListener('click',e=>{
@@ -4794,8 +4822,13 @@ function renderTagEditor(alb, container){
     const set=new Set();
     getEffectiveHierarchy().forEach(g=>{
       (g.children||[]).forEach(c=>{
-        const tag=`${tagName(g.l1)}-${tagName(c.l2)}`;
-        if(isStandardSecondLevelFolderTag(tag)) set.add(tag);
+        const t2=tagName(c.l2);
+        if(isStandardSecondLevelFolderTag(t2)){
+          set.add(t2);
+        } else {
+          const tag=`${tagName(g.l1)}-${t2}`;
+          if(isStandardSecondLevelFolderTag(tag)) set.add(tag);
+        }
       });
     });
     S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{ if(isStandardSecondLevelFolderTag(tag)) set.add(tag); }));
@@ -4865,8 +4898,15 @@ function renderTagEditor(alb, container){
     const l2v=l2Inp.value.trim();
     const folderCandidate = l2v || l1v;
     
+    if(isStandardSecondLevelFolderTag(folderCandidate)){
+      await setPrimaryFolderCategoryTag(alb, folderCandidate);
+      l1Inp.value='';l2Inp.value='';l2Inp.disabled=true;
+      rebuildArea();refreshSug();refreshCurrentAlbumView(alb);
+      return;
+    }
+    
     // 如果属于核心文件夹大类，阻断并提示在左侧输入
-    if(isBlockedOtherL1Option(l1v) || isManagedCategoryTag(l1v) || (l2v && isManagedCategoryTag(l2v)) || isStandardSecondLevelFolderTag(folderCandidate)){
+    if(isBlockedOtherL1Option(l1v) || isManagedCategoryTag(l1v) || (l2v && isManagedCategoryTag(l2v))){
       toast('此处仅添加其他标签；文件夹标签请用左侧输入',2200);
       return;
     }
@@ -5996,7 +6036,16 @@ lbCaption.addEventListener('input',()=>{
           return;
         }
         if(s.running){
-          cmdEl.textContent=`⏳ 執行中（PID ${s.pid}）`;
+          const tailLines=String(s.tail||'').split('\n').map(v=>v.trim()).filter(Boolean);
+          const latestLine=tailLines.length?tailLines[tailLines.length-1]:'';
+          let progressNm='';
+          for(let i=tailLines.length-1;i>=0;i--){
+            const m=tailLines[i].match(/\[(\d+)\s*\/\s*(\d+|\?)\]/);
+            if(m){ progressNm=`${m[1]}/${m[2]}`; break; }
+          }
+          const left=progressNm?`⏳ 執行中（${progressNm}）`:`⏳ 執行中（PID ${s.pid}）`;
+          const progressLine=latestLine?` | ${latestLine.slice(0,80)}`:'';
+          cmdEl.textContent=`${left}${progressLine}`;
           setTimeout(poll,2000);
           return;
         }

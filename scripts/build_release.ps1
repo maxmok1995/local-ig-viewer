@@ -10,7 +10,7 @@ Set-Location $repoRoot
 
 $appName = "LocalAlbum"
 $installerExeName = "安装本地IG.exe"
-$specFile = "本地相册启动器_v3_修复.spec"
+$specFile = "LocalAlbum.spec"
 
 if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
     throw "未找到 Python 启动器 py。请先安装 Python 3。"
@@ -36,7 +36,7 @@ Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue
 Write-Host "[2/4] 构建单文件 EXE..."
 py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build $specFile
 
-$exePath = Join-Path $repoRoot "dist\本地相册启动器_v3_修复.exe"
+$exePath = Join-Path $repoRoot "dist\LocalAlbum.exe"
 if (-not (Test-Path $exePath)) {
     throw "构建失败：未找到 $exePath"
 }

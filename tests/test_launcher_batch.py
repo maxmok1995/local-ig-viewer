@@ -5,7 +5,7 @@ from pathlib import Path
 class LauncherBatchTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = (Path(__file__).resolve().parents[1] / '启动本地相册.bat').read_text(encoding='utf-8', errors='replace')
+        cls.text = (Path(__file__).resolve().parents[1] / '启动本地相册_修复版.bat').read_text(encoding='utf-8', errors='replace')
 
     def test_readiness_check_does_not_depend_on_page_chinese_text_match(self):
         self.assertNotIn("-match '本地相册'", self.text)

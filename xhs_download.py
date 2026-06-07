@@ -81,7 +81,13 @@ def load_cookie():
 ║  5. 复制整行 cookie 值（一长串文字）                         ║
 ╚══════════════════════════════════════════════════════════════╝
 """)
-    cookie = input("请粘贴 Cookie 值（直接回车退出）: ").strip()
+    try:
+        cookie = input("请粘贴 Cookie 值（直接回车退出）: ").strip()
+    except EOFError:
+        print("\n❌  错误：未找到已保存的 Cookie，且当前处于非交互式后台环境，无法输入。")
+        print("    请在本地相册界面的“小红书 Cookie”输入框中填写 Cookie，或在终端中以交互模式运行此脚本。")
+        sys.exit(1)
+
     if not cookie:
         print("❌  未输入 Cookie，退出")
         sys.exit(1)

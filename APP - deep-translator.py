@@ -268,6 +268,86 @@ def poll_queues():
             break
 
     root.after(100, poll_queues)
+def run_cli_mode(folder, lang):
+    global translator, total_tasks, done_tasks
+    print(f"[CLI] 启动翻译任务... 目标文件夹: {folder}, 目标语言: {lang}")
+    sys.stdout.flush()
+    
+    if not os.path.exists(folder) or not os.path.isdir(folder):
+        print(f"[错误] 文件夹不存在: {folder}")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    translator = GoogleTranslator(source="auto", target=lang)
+    
+    print("[测试] 正在测试翻译服务连接...")
+    sys.stdout.flush()
+    try:
+        test_result = translator.translate("สวัสดี")  # 泰语"你好"
+        print(f"[测试] ✅ 连接正常，测试翻译结果：{test_result}")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"[测试] ❌ 连接失败：{e}")
+        print("[测试] 请检查是否能访问 Google，如在大陆/老挝需要开启代理")
+        sys.stdout.flush()
+        sys.exit(1)
+
+    tasks = scan_folder(folder)
+    if not tasks:
+        print("[提示] 没有找到 meta.json / notes.json 文件")
+        sys.stdout.flush()
+        sys.exit(0)
+        
+    total_tasks = len(tasks)
+    done_tasks = 0
+    print(f"发现 {total_tasks} 个文件，并发线程数：{MAX_WORKERS}")
+    sys.stdout.flush()
+    
+    def log_printer():
+        while True:
+            try:
+                msg = log_queue.get(timeout=0.1)
+                print(msg)
+                sys.stdout.flush()
+            except queue.Empty:
+                if done_tasks >= total_tasks:
+                    break
+            except Exception:
+                break
+                
+    printer_thread = threading.Thread(target=log_printer, daemon=True)
+    printer_thread.start()
+    
+    task_queue = queue.Queue()
+    for task in tasks:
+        task_queue.put(task)
+
+    def pool_worker():
+        while True:
+            try:
+                task = task_queue.get_nowait()
+            except queue.Empty:
+                break
+            worker(task)
+
+    threads = [threading.Thread(target=pool_worker, daemon=True) for _ in range(MAX_WORKERS)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+        
+    printer_thread.join(timeout=2)
+    while not log_queue.empty():
+        print(log_queue.get_nowait())
+        sys.stdout.flush()
+        
+    print("✅ 翻译完成！")
+    sys.stdout.flush()
+    sys.exit(0)
+
+
+if _cli.folder:
+    run_cli_mode(_cli.folder, _cli.lang)
 
 
 # ── GUI ──────────────────────────────────────────────────────────
