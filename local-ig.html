@@ -6864,7 +6864,9 @@ function getPhotoPath(alb,photo){
       : `${S.rootAbsPath}/${rel}/${photo.name}`;
   }
   const saved=localStorage.getItem('ig-output-path');
-  const base=(saved||getHtmlDir()+'/downloads'||'').trim().replace(/[/\\]+$/,'');
+  const htmlDir=getHtmlDir();
+  const fallbackBase=htmlDir ? htmlDir+'/downloads' : '';
+  const base=(saved||fallbackBase).trim().replace(/[/\\]+$/,'');
   if(!base) return null;
   const root=S.rootName||'';
   return alb.rootAlbum ? `${base}/${root}/${photo.name}` : `${base}/${root}/${rel}/${photo.name}`;
@@ -6878,7 +6880,9 @@ function getFolderPath(alb){
   }
   // 退回：手动设置的路径 或 HTML 同级 downloads 目录
   const saved=localStorage.getItem('ig-output-path');
-  const base=(saved||getHtmlDir()+'/downloads'||'').trim().replace(/[/\\]+$/,'');
+  const htmlDir=getHtmlDir();
+  const fallbackBase=htmlDir ? htmlDir+'/downloads' : '';
+  const base=(saved||fallbackBase).trim().replace(/[/\\]+$/,'');
   if(!base) return null;
   const root=S.rootName||'';
   return alb.rootAlbum ? `${base}/${root}` : `${base}/${root}/${rel}`;
