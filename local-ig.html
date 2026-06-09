@@ -2907,33 +2907,88 @@ async function readFolder(root){
   const albumRecords=[];
   // 读取 _path.txt，并自动校对文件夹名（防止文件夹改名/移动后路径失效）
   S.rootAbsPath=null;
-  try{
-    const ph=await root.getFileHandle('_path.txt');
-    const raw=(await (await ph.getFile()).text()).trim().replace(/[/\\]+$/,'');
-    if(raw){
-      const storedLast=raw.split(/[/\\]/).pop()||'';
-      if(storedLast===root.name){
-        // _path.txt 已是同名目标目录时，直接信任其保存的真实存储路径，
-        // 不再用 HTML 源码目录重写，否则会把「打开文件夹」误导到项目源码路径。
-        S.rootAbsPath=raw;
+
+  // 1. 尝试从后端服务获取真实的服务器物理路径
+  try {
+    const res = await fetch('/__get_server_info__', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const info = await res.json();
+    if (info && info.ok && info.root) {
+      const normRoot = info.root.replace(/\\/g, '/').replace(/\/+$/, '');
+      const srvLastName = normRoot.split('/').pop().toLowerCase();
+      const openName = root.name.toLowerCase();
+      if (srvLastName === openName) {
+        // 情况A：当前打开的正是后端服务所在的根目录（如本地IG）
+        S.rootAbsPath = normRoot;
       } else {
-        // 文件夹名/位置已变：优先用 ig-output-path + 当前文件夹名重建路径
-        // 若未设置 ig-output-path，则仅替换最后一段（适用于纯改名场景）
-        const savedBase=localStorage.getItem('ig-output-path');
-        if(savedBase&&savedBase.trim()){
-          S.rootAbsPath=savedBase.trim().replace(/[/\\]+$/,'')+'/'+root.name;
-        } else {
-          const parts=raw.split(/[/\\]/);
-          parts[parts.length-1]=root.name;
-          S.rootAbsPath=parts.join('/');
-        }
-        try{
-          const pw=await(await root.getFileHandle('_path.txt',{create:true})).createWritable();
-          await pw.write(S.rootAbsPath);await pw.close();
-        }catch{}
+        // 情况B：当前打开的是子相册目录（如 jovy_irwin）
+        // 其绝对物理路径应该是 后端服务目录 + '/' + 文件夹名
+        S.rootAbsPath = normRoot + '/' + root.name;
       }
+      // 同步更新localStorage和输入框，保持显示一致
+      // 主相册的输出根目录始终对齐为后端服务所在的总物理目录
+      localStorage.setItem('ig-output-path', normRoot);
+      const outInp = $('igOutput');
+      if (outInp) outInp.value = normRoot;
     }
-  }catch{}
+  } catch (e) {
+    console.warn('获取服务器物理路径失败:', e);
+  }
+
+  // 2. 如果后端获取失败，再退回原有的读取 _path.txt 逻辑
+  if (!S.rootAbsPath) {
+    try{
+      const ph=await root.getFileHandle('_path.txt');
+      const raw=(await (await ph.getFile()).text()).trim().replace(/[/\\]+$/,'');
+      if(raw){
+        const storedLast=raw.split(/[/\\]/).pop()||'';
+        if(storedLast===root.name){
+          // _path.txt 已是同名目标目录时，直接信任其保存的真实存储路径，
+          // 不再用 HTML 源码目录重写，否则会把「打开文件夹」误导到项目源码路径。
+          S.rootAbsPath=raw;
+        } else {
+          // 文件夹名/位置已变：优先用 ig-output-path + 当前文件夹名重建路径
+          // 若未设置 ig-output-path，则仅替换最后一段（适用于纯改名场景）
+          const savedBase=localStorage.getItem('ig-output-path');
+          if(savedBase&&savedBase.trim()){
+            S.rootAbsPath=savedBase.trim().replace(/[/\\]+$/,'')+'/'+root.name;
+          } else {
+            const parts=raw.split(/[/\\]/);
+            parts[parts.length-1]=root.name;
+            S.rootAbsPath=parts.join('/');
+          }
+          try{
+            const pw=await(await root.getFileHandle('_path.txt',{create:true})).createWritable();
+            await pw.write(S.rootAbsPath);await pw.close();
+          }catch{}
+        }
+      }
+    }catch{}
+  }
+
+  // 3. 自动同步/校对根目录下的 _path.txt
+  if (S.rootAbsPath) {
+    try {
+      let needWrite = false;
+      try {
+        const ph = await root.getFileHandle('_path.txt');
+        const raw = (await (await ph.getFile()).text()).trim();
+        if (raw !== S.rootAbsPath) needWrite = true;
+      } catch {
+        needWrite = true;
+      }
+      if (needWrite) {
+        const pw = await (await root.getFileHandle('_path.txt', {create:true})).createWritable();
+        await pw.write(S.rootAbsPath);
+        await pw.close();
+      }
+    } catch(e) {
+      console.warn('同步根目录_path.txt失败:', e);
+    }
+  }
   // 根目录自身的 notes.json
   let rootNotesData=null;
   try{
@@ -4906,7 +4961,7 @@ function renderTagEditor(alb, container){
     }
     
     // 如果属于核心文件夹大类，阻断并提示在左侧输入
-    if(isBlockedOtherL1Option(l1v) || isManagedCategoryTag(l1v) || (l2v && isManagedCategoryTag(l2v))){
+    if(isBlockedOtherL1Option(l1v) || isFolderCategoryTag(l1v) || (l2v && isFolderCategoryTag(l2v))){
       toast('此处仅添加其他标签；文件夹标签请用左侧输入',2200);
       return;
     }
@@ -5905,6 +5960,12 @@ lbCaption.addEventListener('input',()=>{
   function getOutPath(){
     if(S.rootAbsPath){
       const norm=S.rootAbsPath.replace(/\\/g,'/').replace(/\/+$/,'');
+      const lastName = norm.split('/').pop().toLowerCase();
+      // 如果当前打开的就是相册的主目录（比如名字是 "本地ig"）
+      // 则无需获取其父目录，直接返回当前根目录作为输出目录，这样子相册会直接建在该目录下。
+      if (lastName === '本地ig') {
+        return norm;
+      }
       const idx=norm.lastIndexOf('/');
       if(idx>0) return norm.slice(0,idx);
     }

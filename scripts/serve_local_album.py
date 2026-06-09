@@ -157,7 +157,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__'):
+        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__', '/__get_server_info__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
@@ -167,6 +167,8 @@ class QuietHandler(SimpleHTTPRequestHandler):
             if self.path == '/__open_folder__':
                 path = str(data.get('path') or '').strip()
                 result = open_folder_in_explorer(path)
+            elif self.path == '/__get_server_info__':
+                result = {'ok': True, 'root': str(resolve_launch_dir()), 'version': '1.0.0'}
             elif self.path == '/__ig_download_status__':
                 pid = int(data.get('pid') or 0)
                 result = get_ig_download_status(pid)
@@ -299,6 +301,23 @@ def _resolve_script(name: str) -> Path | None:
     return None
 
 
+def _resolve_binary_or_script(name: str) -> tuple[list[str], Path] | None:
+    # 1) If frozen, look for bundled EXE in ROOT (_MEIPASS)
+    if getattr(sys, 'frozen', False):
+        exe_name = name.replace('.py', '.exe')
+        exe_path = ROOT / exe_name
+        if exe_path.exists():
+            return [str(exe_path)], ROOT
+
+    # 2) Fallback to system Python + script
+    script = _resolve_script(name)
+    py_cmd = _resolve_python_cmd()
+    if script and py_cmd:
+        return [*py_cmd, str(script)], script.parent
+
+    return None
+
+
 def _start_background_task(cmd: list[str], cwd: Path, log_path: Path) -> dict[str, Any]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open('a', encoding='utf-8', errors='ignore') as logf:
@@ -346,9 +365,6 @@ def _start_background_task(cmd: list[str], cwd: Path, log_path: Path) -> dict[st
 
 def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
     platform = str(payload.get('platform') or '').strip().lower()
-    py_cmd = _resolve_python_cmd()
-    if py_cmd is None:
-        return {'ok': False, 'error': 'python_not_found'}
     launch_dir = resolve_launch_dir()
 
     try:
@@ -365,16 +381,17 @@ def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
             if not out_path.is_absolute():
                 out_path = (launch_dir / out_path).resolve()
             out_path.mkdir(parents=True, exist_ok=True)
-            script = _resolve_script('xhs_download.py')
-            if script is None:
-                return {'ok': False, 'error': 'xhs_script_not_found'}
-            cmd = [*py_cmd, str(script), user, '--output', str(out_path)]
+            resolved = _resolve_binary_or_script('xhs_download.py')
+            if resolved is None:
+                return {'ok': False, 'error': 'xhs_downloader_not_found_or_no_python'}
+            base_cmd, cwd = resolved
+            cmd = [*base_cmd, user, '--output', str(out_path)]
             if count > 0:
                 cmd.extend(['--count', str(count)])
             if cookie:
                 cmd.extend(['--cookie', cookie])
             log_path = out_path / f'xhs_download_{int(time.time())}.log'
-            return _start_background_task(cmd, script.parent, log_path)
+            return _start_background_task(cmd, cwd, log_path)
 
         if platform in ('flat', 'hhcat'):
             folder = str(payload.get('path') or '').strip()
@@ -387,22 +404,24 @@ def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
             if not target.exists() or not target.is_dir():
                 return {'ok': False, 'error': 'path_not_found', 'path': str(target)}
             script_name = 'flat_convert.py' if platform == 'flat' else 'hhcat_convert.py'
-            script = _resolve_script(script_name)
-            if script is None:
-                return {'ok': False, 'error': f'{platform}_script_not_found'}
-            cmd = [*py_cmd, str(script), str(target)]
+            resolved = _resolve_binary_or_script(script_name)
+            if resolved is None:
+                return {'ok': False, 'error': f'{platform}_converter_not_found_or_no_python'}
+            base_cmd, cwd = resolved
+            cmd = [*base_cmd, str(target)]
             if dry_run:
                 cmd.append('--dry-run')
             log_path = target / f'{platform}_convert_{int(time.time())}.log'
-            return _start_background_task(cmd, script.parent, log_path)
+            return _start_background_task(cmd, cwd, log_path)
 
         if platform == 'trans':
             folder = str(payload.get('path') or '').strip()
             lang = str(payload.get('lang') or 'en').strip() or 'en'
-            script = _resolve_script('APP - deep-translator.py')
-            if script is None:
-                return {'ok': False, 'error': 'trans_script_not_found'}
-            cmd = [*py_cmd, str(script), '--lang', lang]
+            resolved = _resolve_binary_or_script('APP - deep-translator.py')
+            if resolved is None:
+                return {'ok': False, 'error': 'translator_not_found_or_no_python'}
+            base_cmd, cwd = resolved
+            cmd = [*base_cmd, '--lang', lang]
             log_dir = resolve_launch_dir()
             if folder:
                 target = Path(folder)
@@ -413,7 +432,7 @@ def run_add_task(payload: dict[str, Any]) -> dict[str, Any]:
                 cmd.extend(['--folder', str(target)])
                 log_dir = target
             log_path = log_dir / f'translate_{int(time.time())}.log'
-            return _start_background_task(cmd, script.parent, log_path)
+            return _start_background_task(cmd, cwd, log_path)
 
         return {'ok': False, 'error': 'unsupported_platform'}
     except Exception as exc:
@@ -460,14 +479,12 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
-    script = _resolve_ig_script()
-    if script is None:
-        return {'ok': False, 'error': 'ig_script_not_found'}
-    py_cmd = _resolve_python_cmd()
-    if py_cmd is None:
-        return {'ok': False, 'error': 'python_not_found'}
+    resolved = _resolve_binary_or_script('ig_download.py')
+    if resolved is None:
+        return {'ok': False, 'error': 'ig_downloader_not_found_or_no_python'}
+    base_cmd, cwd = resolved
 
-    cmd = [*py_cmd, str(script), username, '--output', str(out_path)]
+    cmd = [*base_cmd, username, '--output', str(out_path)]
     if count > 0:
         cmd.extend(['--count', str(count)])
     if sessionid:
@@ -477,7 +494,7 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
 
     try:
         log_path = out_path / f'ig_download_{username}.log'
-        started = _start_background_task(cmd, script.parent, log_path)
+        started = _start_background_task(cmd, cwd, log_path)
         if not started.get('ok'):
             return started
         proc = IG_TASKS[int(started['pid'])]['proc']
@@ -498,7 +515,7 @@ def run_ig_download(payload: dict[str, Any]) -> dict[str, Any]:
             'ok': True,
             'pid': int(started['pid']),
             'cmd': cmd,
-            'script': str(script),
+            'script': str(base_cmd[-1]),
             'log': str(log_path),
         }
     except Exception as exc:

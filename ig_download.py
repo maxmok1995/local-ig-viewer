@@ -23,6 +23,12 @@ Instagram 下载器 — 配合本地相册查看器 (local-ig.html) 使用
 import json
 import os
 import sys
+
+if False:
+    import instaloader
+    import requests
+    import browser_cookie3
+
 import time
 import random
 import re
@@ -588,78 +594,95 @@ def main() -> int:
 
     # 获取 Profile
     print("🔍  获取账号信息…")
+    profile = None
+    use_mobile_fallback = False
     try:
         profile = instaloader.Profile.from_username(L.context, args.username)
     except instaloader.exceptions.ProfileNotExistsException:
-        print(f"❌  无法获取 @{args.username}")
-        print(f"    可能原因：① 账号不存在  ② Instagram 要求登录（403）")
-        print(f"\n  💡 解决方案（按推荐顺序）：")
-        print(f"     1. 在 Chrome 中登录 Instagram，然后加 --cookies-from-browser chrome")
-        print(f"     2. 加 --login 参数，手动输入 Instagram 账号密码")
-        sys.exit(1)
+        if args.sessionid or args.cookies_from_browser:
+            print("⚠️  Web API 无法获取账号信息，尝试使用移动端 API 降级模式…")
+            use_mobile_fallback = True
+        else:
+            print(f"❌  无法获取 @{args.username}")
+            print(f"    可能原因：① 账号不存在  ② Instagram 要求登录（403）")
+            print(f"\n  💡 解决方案（按推荐顺序）：")
+            print(f"     1. 在 Chrome 中登录 Instagram，然后加 --cookies-from-browser chrome")
+            print(f"     2. 加 --login 参数，手动输入 Instagram 账号密码")
+            sys.exit(1)
     except instaloader.exceptions.PrivateProfileNotFollowedException:
         print(f"❌  @{args.username} 是私密账号")
         print(f"    请加 --login 参数，以关注者身份访问")
         sys.exit(1)
     except Exception as e:
         msg = str(e)
-        print(f"❌  获取失败: {msg}")
-        if '403' in msg or 'Forbidden' in msg:
-            print(f"\n  💡 Instagram 拒绝了匿名 GraphQL 请求（403）")
-            print(f"     建议优先使用：--cookies-from-browser chrome")
-            print(f"     其次使用：--sessionid <从 DevTools 复制的值>")
-            print(f"     或最後再試：--login")
-        elif '401' in msg or 'Unauthorized' in msg or 'wait a few minutes' in msg:
-            print(f"\n  💡 Instagram 要求登录验证，请在命令末尾加上 --login 参数后重试")
-        sys.exit(1)
+        if args.sessionid or args.cookies_from_browser:
+            print(f"⚠️  Web API 获取失败 ({msg})，尝试使用移动端 API 降级模式…")
+            use_mobile_fallback = True
+        else:
+            print(f"❌  获取失败: {msg}")
+            if '403' in msg or 'Forbidden' in msg:
+                print(f"\n  💡 Instagram 拒绝了匿名 GraphQL 请求（403）")
+                print(f"     建议优先使用：--cookies-from-browser chrome")
+                print(f"     其次使用：--sessionid <从 DevTools 复制的值>")
+                print(f"     或最後再試：--login")
+            elif '401' in msg or 'Unauthorized' in msg or 'wait a few minutes' in msg:
+                print(f"\n  💡 Instagram 要求登录验证，请在命令末尾加上 --login 参数后重试")
+            sys.exit(1)
 
     total = None
-    try:
-        total = profile.mediacount
-    except Exception as e:
-        print(f"⚠️  无法读取帖子总数（mediacount）：{e}")
-        print("    将切换为降级模式继续下载（建议同时提供 --count）")
+    if not use_mobile_fallback:
+        try:
+            total = profile.mediacount
+        except Exception as e:
+            print(f"⚠️  无法读取帖子总数（mediacount）：{e}")
+            print("    将切换为降级模式继续下载（建议同时提供 --count）")
 
-    if args.check:
-        if total is None:
-            print("\n  ⚠️  当前会话无法查询总数（GraphQL 受限）")
-            print("  → 请改用 --count N 直接下载最新 N 条\n")
-            sys.exit(2)
-        print(f"\n  ✓  @{profile.username}  共 {total} 条帖子")
-        print(f"\n  → 请将 {total} 填入页面的帖数输入框，选择下载范围\n")
-        sys.exit(0)
+        if args.check:
+            if total is None:
+                print("\n  ⚠️  当前会话无法查询总数（GraphQL 受限）")
+                print("  → 请改用 --count N 直接下载最新 N 条\n")
+                sys.exit(2)
+            print(f"\n  ✓  @{profile.username}  共 {total} 条帖子")
+            print(f"\n  → 请将 {total} 填入页面的帖数输入框，选择下载范围\n")
+            sys.exit(0)
 
     session = requests.Session()
+    posts_iter = None
+    limit = 0
 
-    try:
-        if args.start is not None or args.end is not None:
-            if total is None:
-                print("❌  当前会话无法读取总数，暂不支持 --start/--end 范围模式")
-                print("    请改用 --count N，或切换登录方式后重试")
-                sys.exit(1)
-            start = max(1, args.start or 1)
-            end   = min(args.end or total, total)
-            limit = max(0, end - start + 1)
-            posts_iter = islice(profile.get_posts(), start - 1, end)
-            print(f"✓  @{profile.username}  {total} 条帖子，准备下载第 {start}–{end} 条（共 {limit} 条）\n")
-        else:
-            if args.count:
-                limit = min(args.count, total) if total is not None else args.count
-                posts_iter = islice(profile.get_posts(), limit)
-                total_label = f"{total} 条帖子，" if total is not None else ""
-                print(f"✓  @{profile.username}  {total_label}准备下载最新 {limit} 条\n")
-            else:
+    if not use_mobile_fallback:
+        try:
+            if args.start is not None or args.end is not None:
                 if total is None:
-                    print("❌  当前会话无法读取总数，且未提供 --count")
-                    print("    请改用: --count N（例如 --count 200）")
+                    print("❌  当前会话无法读取总数，暂不支持 --start/--end 范围模式")
+                    print("    请改用 --count N，或切换登录方式后重试")
                     sys.exit(1)
-                limit = total
-                posts_iter = islice(profile.get_posts(), limit)
-                print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
-    except instaloader.exceptions.QueryReturnedBadRequestException as e:
-        print(f"⚠️  GraphQL 接口受限：{e}")
+                start = max(1, args.start or 1)
+                end   = min(args.end or total, total)
+                limit = max(0, end - start + 1)
+                posts_iter = islice(profile.get_posts(), start - 1, end)
+                print(f"✓  @{profile.username}  {total} 条帖子，准备下载第 {start}–{end} 条（共 {limit} 条）\n")
+            else:
+                if args.count:
+                    limit = min(args.count, total) if total is not None else args.count
+                    posts_iter = islice(profile.get_posts(), limit)
+                    total_label = f"{total} 条帖子，" if total is not None else ""
+                    print(f"✓  @{profile.username}  {total_label}准备下载最新 {limit} 条\n")
+                else:
+                    if total is None:
+                        print("❌  当前会话无法读取总数，且未提供 --count")
+                        print("    请改用: --count N（例如 --count 200）")
+                        sys.exit(1)
+                    limit = total
+                    posts_iter = islice(profile.get_posts(), limit)
+                    print(f"✓  @{profile.username}  {total} 条帖子，准备下载最新 {limit} 条\n")
+        except instaloader.exceptions.QueryReturnedBadRequestException as e:
+            print(f"⚠️  GraphQL 接口受限：{e}")
+            use_mobile_fallback = True
+
+    if use_mobile_fallback:
         print("    尝试切换到移动端 API 降级模式…")
-        sid = _get_sessionid_from_loader(L)
+        sid = _get_sessionid_from_loader(L) or _clean_sessionid(args.sessionid)
         if not sid:
             print("❌  降级模式需要有效 sessionid（请填写 Session ID 或使用可读 Cookie）")
             sys.exit(1)

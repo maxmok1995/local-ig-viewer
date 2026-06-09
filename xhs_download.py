@@ -22,6 +22,11 @@
 import asyncio
 import json
 import os
+
+if False:
+    import playwright
+    import requests
+
 import sys
 import time
 import random
