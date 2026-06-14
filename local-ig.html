@@ -3094,6 +3094,26 @@ async function readFolder(root){
     albumRecords.unshift(createAlbumIndexRecord({name:'__root__',handle:null,photos:rootPhotos,postMeta:null,rootAlbum:true,firstImage:rootLooseImgs[0]||null,notesData:rootNotesData}));
   }
 
+  // 4. 扫描所有已识别的相册记录，自动补全那些直接包含图片的物理分类相册文件夹名
+  albumRecords.forEach(a => {
+    const possibleTags = [a.name, ...(a._inheritTags || [])];
+    possibleTags.forEach(t => {
+      if (!t) return;
+      const v = String(t).trim();
+      const isMatch = STANDARD_SECOND_LEVEL_FOLDERS.includes(v) || (() => {
+        const dash = v.indexOf('-');
+        if (dash > 0) {
+          const parent = v.slice(0, dash).trim();
+          if (FOLDER_L1_CORES.has(normalizeTagCore(parent))) return true;
+        }
+        return FOLDER_L1_CORES.has(normalizeTagCore(v));
+      })();
+      if (isMatch) {
+        detectedCategories.push(v);
+      }
+    });
+  });
+
   S.defaultFolderCategories=[...new Set(detectedCategories)].length ? [...new Set(detectedCategories)] : [...STANDARD_SECOND_LEVEL_FOLDERS];
   const snapshot = buildRootIndexSnapshot(root, albumRecords);
   await writeRootIndexSnapshot(root, snapshot);
