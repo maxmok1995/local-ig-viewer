@@ -3109,6 +3109,8 @@ async function readFolder(root){
           catAlbumRecords.forEach(a=>a._folderRelPath=name);
           albumRecords.push(...catAlbumRecords);
         }catch{}
+      } else if(kind==='empty' && STANDARD_SECOND_LEVEL_FOLDERS.includes(name)){
+        albumRecords.push(createAlbumIndexRecord({name,handle:h,photos:[],postMeta:null,firstImage:null,notesData:null}));
       }
     }catch{}
   }
@@ -7235,6 +7237,10 @@ async function doMovePhoto(srcAlb,photo,destAlb){
 
     destAlb.photos.push(newPhoto);
     if(!destAlb.firstImage&&!newPhoto.isVideo) destAlb.firstImage=newPhoto;
+    if(!destAlb.coverUrl){
+      const coverSrc=destAlb.firstImage||newPhoto;
+      if(coverSrc) destAlb.coverUrl=URL.createObjectURL(coverSrc.file);
+    }
 
     // 5. 从源相册移除
     srcAlb.photos=srcAlb.photos.filter(p=>p!==photo);
