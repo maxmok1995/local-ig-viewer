@@ -71,6 +71,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .view.on{display:block}
 #vLB{top:0;z-index:200;display:none}
 #vLB.on{display:flex;flex-direction:column}
+#vLBBody{display:flex;flex:1;min-height:0;flex-direction:column}
 
 /* ── Welcome ─────────────────────────────────────────────── */
 #vWelcome{display:flex;flex-direction:column;align-items:center;
@@ -312,6 +313,44 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   transition:background .15s;white-space:nowrap;
 }
 .lbActBtn:hover{background:#252525}
+
+@media(min-width: 768px) {
+  #vLBBody {
+    flex-direction: row;
+  }
+  .lbFoot {
+    width: 340px;
+    height: 100%;
+    border-top: none;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  .lbActions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    width: 100%;
+  }
+  .lbActBtn {
+    justify-content: center;
+    width: 100%;
+    margin: 0 !important;
+  }
+  .lbCaptionWrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: 0;
+  }
+  .lbCaption {
+    max-height: 400px;
+  }
+}
 
 /* ── Misc ─────────────────────────────────────────────────── */
 .loading{display:flex;flex-direction:column;align-items:center;
@@ -1324,16 +1363,18 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       <button class="hbtn ghost" id="lbFullscreen" title="全屏">⛶</button>
     </div>
   </div>
-  <div class="lbImgArea">
-    <img id="lbImg" src="" alt="">
-    <video id="lbVideo" controls playsinline style="display:none"></video>
-    <button class="lbNav l" id="lbPrev">‹</button>
-    <button class="lbNav r" id="lbNext">›</button>
-  </div>
-  <div class="lbFoot">
-    <div class="lbCaptionWrap">
-      <span class="lbCaptionIcon" id="lbCaptionIcon">✏️</span>
-      <textarea class="lbCaption" id="lbCaption" rows="1" placeholder="写下这张照片的故事…"></textarea>
+  <div id="vLBBody">
+    <div class="lbImgArea">
+      <img id="lbImg" src="" alt="">
+      <video id="lbVideo" controls playsinline style="display:none"></video>
+      <button class="lbNav l" id="lbPrev">‹</button>
+      <button class="lbNav r" id="lbNext">›</button>
+    </div>
+    <div class="lbFoot">
+      <div class="lbCaptionWrap">
+        <span class="lbCaptionIcon" id="lbCaptionIcon">✏️</span>
+        <textarea class="lbCaption" id="lbCaption" rows="1" placeholder="写下这张照片的故事…"></textarea>
+      </div>
     </div>
   </div>
 </div>
