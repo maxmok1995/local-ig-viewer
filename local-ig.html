@@ -1636,8 +1636,17 @@ const COUNTRY_MAP = [
 
 // ── 兩級標簽層次（L1 + L2 子項）────────────────────────────────────────────
 const TAG_HIERARCHY = [
-  { l1:{zh:'💼 辦公',en:'💼 Work',th:'💼 งาน',ja:'💼 仕事',ko:'💼 업무'},
-    kw:['office','辦公','办公','工作','會議','会议','meeting','conference','business','出差','職場','职场','商務','商务','boardroom'],
+  { l1:{zh:'📸 角度',en:'📸 Angle',th:'📸 มุมกล้อง',ja:'📸 角度',ko:'📸 각도'},
+    kw:['角度','视角','視野','摄影角度','拍摄角度','视角','มุมกล้อง','angle','pov','view'],
+    children:[
+      {l2:{zh:'自拍',en:'Selfie',th:'เซลฟี่',ja:'自撮り',ko:'셀카'},kw:['自拍','selfie','自撮','셀카','เซลฟี่']},
+      {l2:{zh:'第一視角',en:'POV',th:'มุมมองบุคคลที่หนึ่ง',ja:'一人称視点',ko:'1인칭 시점'},kw:['第一视角','第一視角','第一人称','第一人稱','pov','first person']},
+      {l2:{zh:'擺拍',en:'Posed',th:'โพสท่า',ja:'ポーズ',ko:'포즈'},kw:['摆拍','擺拍','pose','posing','擺姿勢','摆姿势','포즈','โพส']},
+    ]
+  },
+
+  { l1:{zh:'🇲🇾 馬來西亞',en:'🇲🇾 Malaysia',th:'🇲🇾 มาเลเซีย',ja:'🇲🇾 マレーシア',ko:'🇲🇾 말레이시아'},
+    kw:['馬來西亞','马来西亚','malaysia','吉隆坡','檳城','馬六甲','沙巴','kuala lumpur','penang','malacca','sabah'],
     _alwaysShowArrow:true },
 
   { l1:{zh:'✨ 逼格',en:'✨ Aesthetic',th:'✨ สไตล์',ja:'✨ おしゃれ',ko:'✨ 감성'},
@@ -1660,34 +1669,29 @@ const TAG_HIERARCHY = [
     ]
   },
 
-  { l1:{zh:'🏠 居家',en:'🏠 Home',th:'🏠 ในบ้าน',ja:'🏠 おうち',ko:'🏠 홈'},
+  { l1:{zh:'🏠 居家',en:'🏠 Home',th:'🏠 在บ้าน',ja:'🏠 おうち',ko:'🏠 홈'},
     kw:['居家','室內','室内','家裡','家里','廚房','厨房','客廳','客厅','臥室','卧室','料理','自煮','cooking','baking','烘焙','家居','佈置','布置','interior'] },
 
-  { l1:{zh:'✈️ 旅行',en:'✈️ Travel',th:'✈️ ท่องเที่ยว',ja:'✈️ 旅行',ko:'✈️ 여행'},
-    kw:['旅行','旅遊','旅游','trip','travel','vacation','出發','出发','景點','景点','觀光','观光','tour','journey'],
-    _useCountryMap:true, _useLocationAsL2:true
+  { l1:{zh:'🇨🇳 中國',en:'🇨🇳 China',th:'🇨🇳 ประเทศจีน',ja:'🇨🇳 中国',ko:'🇨🇳 중국'},
+    kw:['中國','中国','china','北京','上海','廣州','深圳','成都','重慶','杭州','西安','南京','武漢','南京','蘇州','苏州','廣東','广东'],
+    _useLocationAsL2:true
   },
 
-  { l1:{zh:'🌆 周末-城市',en:'🌆 Weekend-City',th:'🌆 วีคเอนด์',ja:'🌆 週末・都市',ko:'🌆 주말-도시'},
-    kw:['周末-城市'],
-    children:[
-      {l2:{zh:'吃喝',en:'Dining',th:'กินดื่ม',ja:'グルメ',ko:'맛집'},kw:['餐廳','餐厅','美食','food','eat','restaurant','cafe','咖啡','brunch','dinner','lunch','breakfast','dessert','甜點','甜点','燒肉','烧肉','火鍋','火锅','omakase','飲食','饮食','下午茶','afternoon tea']},
-      {l2:{zh:'玩樂',en:'Entertainment',th:'ความบันเทิง',ja:'エンタメ',ko:'놀이'},kw:['演唱會','演唱会','concert','music','音樂','音乐','購物','购物','shopping','mall','電影','电影','movie','ktv','夜市','逛街','nightlife','park','公園','公园','遊樂','游乐','bar','酒吧']},
-      {l2:{zh:'運動',en:'Sports',th:'ออกกำลังกาย',ja:'スポーツ',ko:'운동'},kw:['gym','健身','workout','exercise','run','跑步','yoga','瑜伽','swimming','游泳','cycling','單車','单车','pilates','training','訓練','训练']},
-    ]
+  { l1:{zh:'😍 愛好',en:'😍 Hobby',th:'😍 งานอดิเรก',ja:'😍 趣味',ko:'😍 취미'},
+    kw:['愛好']
   },
 
-  { l1:{zh:'🌲 周末-山海',en:'🌲 Weekend-Nature',th:'🌲 ธรรมชาติ',ja:'🌲 週末・自然',ko:'🌲 주말-자연'},
-    kw:['周末-山林','登山','爬山','hiking','mountain','trail','步道','trek','outdoor','戶外','户外','camping','露營','露营','自然','nature','森林','forest','lake','湖','river','河','waterfall','瀑布','海邊','海边','海灘','海滩','beach','island','surf','浮潛','浮潜','snorkel','diving','潛水','潜水','農場','农场'],
+  { l1:{zh:'🇹🇼 台灣',en:'🇹🇼 Taiwan',th:'🇹🇼 ไต้หวัน',ja:'🇹🇼 台湾',ko:'🇹🇼 대만'},
+    kw:['台灣','台湾','taiwan','台北','台中','高雄','台南','新竹','宜蘭','花蓮','台東','墾丁','taipei','kaohsiung','taichung'],
     _alwaysShowArrow:true
   },
 ];
 
 // ── 快速標籤（多語言）────────────────────────────────────────────────────────
 const QUICK_TAG_DATA = [
-  {'zh-TW':'📸 自拍','zh-CN':'📸 自拍','en':'📸 Selfie','ja':'📸 自撮り','ko':'📸 셀카','th':'📸 เซลฟี่'},
-  {'zh-TW':'👥 合照','zh-CN':'👥 合照','en':'👥 Group Photo','ja':'👥 集合写真','ko':'👥 단체사진','th':'👥 รูปหมู่'},
-  {'zh-TW':'🐾 毛孩','zh-CN':'🐾 毛孩','en':'🐾 Pets','ja':'🐾 ペット','ko':'🐾 반려동물','th':'🐾 สัตว์เลี้ยง'},
+  {'zh-TW':'📸 角度/自拍','zh-CN':'📸 角度/自拍','en':'📸 Angle/Selfie','ja':'📸 角度/自撮り','ko':'📸 각도/셀카','th':'📸 มุมกล้อง/เซลฟี่'},
+  {'zh-TW':'📸 角度/第一視角','zh-CN':'📸 角度/第一视角','en':'📸 Angle/POV','ja':'📸 角度/一人称視点','ko':'📸 각도/1인칭 시점','th':'📸 มุมกล้อง/มุมมองบุคคลที่หนึ่ง'},
+  {'zh-TW':'📸 角度/擺拍','zh-CN':'📸 角度/摆拍','en':'📸 Angle/Posed','ja':'📸 角度/ポーズ','ko':'📸 각도/포즈','th':'📸  มุมกล้อง/โพสท่า'},
 ];
 function getQuickTags(){ return QUICK_TAG_DATA.map(e=>e[currentLang]||e['en']); }
 
