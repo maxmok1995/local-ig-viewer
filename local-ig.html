@@ -4475,6 +4475,19 @@ function renderHomePhotoGrid(container){
         card.appendChild(img);
       }
 
+      // 標籤浮層（只顯示 L1）
+      if(alb.tags?.length){
+        const shownTags=alb.tags.filter(t=>!t.includes('/'));
+        if(shownTags.length){
+          const tagsEl=document.createElement('div');tagsEl.className='cardTags';
+          shownTags.slice(0,3).forEach(tag=>{
+            const sp=document.createElement('span');sp.className='cardTag';sp.textContent=tag;
+            tagsEl.appendChild(sp);
+          });
+          card.appendChild(tagsEl);
+        }
+      }
+
       const ov=document.createElement('div');ov.className='overlay';
       const posEl=document.createElement('div');posEl.className='cardPos';
       posEl.textContent=`${photoIdx+1} / ${totalVisible}`;
@@ -4495,7 +4508,7 @@ function renderHomePhotoGrid(container){
           updateBatchBar();
           return;
         }
-        openLB(alb,alb.photos.indexOf(photo));
+        goAlbum(alb);
       });
       card.addEventListener('contextmenu',e=>{
         e.preventDefault();
