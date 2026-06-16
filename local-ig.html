@@ -3437,6 +3437,7 @@ function updateGridBtn(){
 }
 function openLB(alb,idx){
   S.currentAlbum=alb;S.currentIdx=idx;
+  if(S.view!=='album') renderAlbumGrid(alb);
   showView('lb');renderLB();$('hdr').style.display='none';
 }
 // _slideshowTimer defined later; stopSlideshow() is a forward-callable fn reference
@@ -4430,6 +4431,20 @@ function renderHomePhotoGrid(container){
     const totalVisible = items[0].totalVisible;
     const visiblePhotos=alb.photos.filter(photo=>S.showVideoCoverPhotos||!photo._isVideoCover);
     groupTitle.textContent=`${alb.title||albName} · ${items.length} ${t('previewPhotos')}`;
+    if(alb.tags?.length){
+      const shownTags=alb.tags.filter(t=>!t.includes('/'));
+      if(shownTags.length){
+        const tagsContainer=document.createElement('span');
+        tagsContainer.style.cssText='margin-left:12px;display:inline-flex;gap:6px;vertical-align:middle;';
+        shownTags.forEach(tag=>{
+          const sp=document.createElement('span');
+          sp.style.cssText='font-size:10px;font-weight:normal;padding:1px 6px;border-radius:4px;background:var(--s2);border:1px solid var(--border);color:var(--muted);';
+          sp.textContent=tag;
+          tagsContainer.appendChild(sp);
+        });
+        groupTitle.appendChild(tagsContainer);
+      }
+    }
     group.appendChild(groupTitle);
     const grid=document.createElement('div');grid.className='homeGrid';
     items.forEach(({alb,photo,photoIdx})=>{
@@ -4508,7 +4523,7 @@ function renderHomePhotoGrid(container){
           updateBatchBar();
           return;
         }
-        goAlbum(alb);
+        openLB(alb,alb.photos.indexOf(photo));
       });
       card.addEventListener('contextmenu',e=>{
         e.preventDefault();
