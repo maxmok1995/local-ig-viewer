@@ -5,11 +5,11 @@ a = Analysis(
     ['scripts\\serve_local_album.py'],
     pathex=[],
     binaries=[
-        ('dist/ig_download.exe', '.'),
-        ('dist/xhs_download.exe', '.'),
-        ('dist/flat_convert.exe', '.'),
-        ('dist/hhcat_convert.exe', '.'),
-        ('dist/APP - deep-translator.exe', '.'),
+        ('dist_bins/ig_download.exe', '.'),
+        ('dist_bins/xhs_download.exe', '.'),
+        ('dist_bins/flat_convert.exe', '.'),
+        ('dist_bins/hhcat_convert.exe', '.'),
+        ('dist_bins/APP - deep-translator.exe', '.'),
     ],
     datas=[
         ('ig_download.py', '.'),
