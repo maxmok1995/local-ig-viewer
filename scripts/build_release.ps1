@@ -32,6 +32,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 Write-Host "[1/5] 清理旧构建目录..."
 Remove-Item -Recurse -Force "build" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "dist_bins" -ErrorAction SilentlyContinue
 
 Write-Host "[2/5] 构建子程序二进制组件..."
 Write-Host "-> 正在构建 ig_download.exe..."
@@ -45,17 +46,19 @@ py -3 -m PyInstaller --noconfirm --clean --distpath dist/hhcat_convert --workpat
 Write-Host "-> 正在构建 APP - deep-translator.exe..."
 py -3 -m PyInstaller --noconfirm --clean --distpath dist/deep_translator --workpath build/deep_translator --onefile "APP - deep-translator.py"
 
-# 统一收集子程序到 dist 目录
-New-Item -ItemType Directory -Path "dist" -Force | Out-Null
-Copy-Item "dist/ig_download/ig_download.exe" "dist/ig_download.exe" -Force
-Copy-Item "dist/xhs_download/xhs_download.exe" "dist/xhs_download.exe" -Force
-Copy-Item "dist/flat_convert/flat_convert.exe" "dist/flat_convert.exe" -Force
-Copy-Item "dist/hhcat_convert/hhcat_convert.exe" "dist/hhcat_convert.exe" -Force
-Copy-Item "dist/deep_translator/APP - deep-translator.exe" "dist/APP - deep-translator.exe" -Force
+# 统一收集子组件到 dist_bins 临时存放目录中
+New-Item -ItemType Directory -Path "dist_bins" -Force | Out-Null
+Copy-Item "dist/ig_download/ig_download.exe" "dist_bins/ig_download.exe" -Force
+Copy-Item "dist/xhs_download/xhs_download.exe" "dist_bins/xhs_download.exe" -Force
+Copy-Item "dist/flat_convert/flat_convert.exe" "dist_bins/flat_convert.exe" -Force
+Copy-Item "dist/hhcat_convert/hhcat_convert.exe" "dist_bins/hhcat_convert.exe" -Force
+Copy-Item "dist/deep_translator/APP - deep-translator.exe" "dist_bins/APP - deep-translator.exe" -Force
 
 Write-Host "[3/5] 构建主程序单文件 EXE..."
-# 注意：主程序构建不可带 --clean，否则会清空我们刚刚收集的子程序
-py -3 -m PyInstaller --noconfirm --distpath dist --workpath build $specFile
+py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build $specFile
+
+# 构建完主程序后删除临时二进制目录
+Remove-Item -Recurse -Force "dist_bins" -ErrorAction SilentlyContinue
 
 $exePath = Join-Path $repoRoot "dist\LocalAlbum.exe"
 if (-not (Test-Path $exePath)) {
