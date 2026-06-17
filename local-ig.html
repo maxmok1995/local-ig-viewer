@@ -3277,6 +3277,9 @@ function toast(msg,dur=2400){
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function showView(name){
+  if(name==='lb' && S.view!=='album'){
+    renderAlbumGrid(S.currentAlbum);
+  }
   ['vWelcome','vRestore','vHome','vMap','vAlbum','vLB'].forEach(id=>$(id).classList.remove('on'));
   $({welcome:'vWelcome',restore:'vRestore',home:'vHome',map:'vMap',album:'vAlbum',lb:'vLB'}[name]).classList.add('on');
   S.view=name;
@@ -3437,7 +3440,6 @@ function updateGridBtn(){
 }
 function openLB(alb,idx){
   S.currentAlbum=alb;S.currentIdx=idx;
-  if(S.view!=='album') renderAlbumGrid(alb);
   showView('lb');renderLB();$('hdr').style.display='none';
 }
 // _slideshowTimer defined later; stopSlideshow() is a forward-callable fn reference
