@@ -3492,10 +3492,7 @@ function locToCountry(loc){
   if(!loc) return null;
   const l=loc.toLowerCase().trim();
   for(const entry of COUNTRY_MAP){
-    if(entry.kw.some(kw=>{
-      const k=kw.toLowerCase();
-      return k===l||(k.length>=3&&l.includes(k));
-    })) return tagName(entry);
+    if(entry.kw.some(kw=>matchKeyword(l, kw))) return tagName(entry);
   }
   return null;
 }
@@ -3515,8 +3512,15 @@ function applyLocationL2(alb, newLoc, oldLoc){
       const removes=new Set();
       if(g._useCountryMap){
         const c=locToCountry(oldLoc);
-        if(c) removes.add(`${l1}/${c}/${oldLoc}`);
-        // 無國家時沒有產生 tag，不需移除
+        if(c){
+          removes.add(`${l1}/${c}/${oldLoc}`);
+          
+          // 如果新旧国家不同，也把旧国家 L2 移除
+          const newC = newLoc ? locToCountry(newLoc) : null;
+          if (c !== newC) {
+            removes.add(`${l1}/${c}`);
+          }
+        }
       } else {
         removes.add(`${l1}/${oldLoc}`);
       }
@@ -3533,7 +3537,7 @@ function applyLocationL2(alb, newLoc, oldLoc){
           if(!alb.tags.includes(`${l1}/${c}`)) toAdd.push(`${l1}/${c}`);// 國家 L2
           toAdd.push(`${l1}/${c}/${newLoc}`);                           // 地點 L3
         }
-        // 找不到國家 → 不產生任何 tag（避免 L2 太雜）
+        // 找不到國家 → 不產生 any tag（避免 L2 太雜）
       } else {
         toAdd.push(`${l1}/${newLoc}`);
       }
