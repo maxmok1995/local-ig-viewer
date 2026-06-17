@@ -3244,19 +3244,41 @@ async function writeNotes(alb){
 // Runs automatically after each folder load to repair any notes.json missing photos
 function recoverNotesFromMemory(){
   let count=0;
+  let raw=store._d();
+  let changed=false;
   (S.albums||[]).forEach(alb=>{
-    const memPhotos=alb.notesData?.photos;
-    if(!memPhotos||!Object.keys(memPhotos).length) return;
-    const raw=store._d();
-    const existing=raw[alb.name]?.photos||{};
-    const merged={...memPhotos,...existing}; // existing localStorage edits win over notesData
-    if(!raw[alb.name]) raw[alb.name]={};
-    raw[alb.name].photos=merged;
-    try{localStorage.setItem('ig-notes',JSON.stringify(raw));}catch{}
-    scheduleWrite(alb);
-    count++;
+    const nd=alb.notesData;
+    if(!nd) return;
+    let patch={};
+    let needPatch=false;
+    if(nd.title && !raw[alb.name]?.title) { patch.title=nd.title; needPatch=true; }
+    if(nd.desc && !raw[alb.name]?.desc) { patch.desc=nd.desc; needPatch=true; }
+    if(nd.location && !raw[alb.name]?.location) { patch.location=nd.location; needPatch=true; }
+    if(nd.tags && nd.tags.length){
+      const localTags=raw[alb.name]?.tags||[];
+      if(localTags.length!==nd.tags.length || !nd.tags.every(t=>localTags.includes(t))){
+        patch.tags=nd.tags;
+        needPatch=true;
+      }
+    }
+    if(nd.photos && Object.keys(nd.photos).length){
+      const existing=raw[alb.name]?.photos||{};
+      const merged={...nd.photos,...existing};
+      if(Object.keys(merged).length !== Object.keys(existing).length){
+        patch.photos=merged;
+        needPatch=true;
+      }
+    }
+    if(needPatch){
+      raw[alb.name]={...raw[alb.name]||{},...patch};
+      changed=true;
+      count++;
+    }
   });
-  if(count>0) toast(`已恢復 ${count} 個相冊的備注`);
+  if(changed){
+    store._s(raw);
+  }
+  if(count>0) toast(`已同步 ${count} 个相册的本地备注与标签`);
 }
 
 // ── DOM ───────────────────────────────────────────────────────────────────
