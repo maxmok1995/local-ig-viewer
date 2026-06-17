@@ -2482,6 +2482,40 @@ function getFolderCategoryGroupsForToggle(){
 function isStandardSecondLevelFolderTag(tag){
   return STANDARD_SECOND_LEVEL_FOLDERS.includes(String(tag||'').trim());
 }
+function parseFolderRelPath(relPath) {
+  const parts = String(relPath || '').split('/').map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return { role: '', category: '', albumName: '' };
+  }
+  if (parts.length === 1) {
+    return { role: '', category: '', albumName: parts[0] };
+  }
+  
+  // 检查第一段 parts[0] 是否属于标准二级分类集
+  const isStandard = STANDARD_SECOND_LEVEL_FOLDERS.includes(parts[0]);
+  if (isStandard) {
+    return {
+      role: '',
+      category: parts[0],
+      albumName: parts.slice(1).join('/')
+    };
+  } else {
+    if (parts.length >= 3) {
+      return {
+        role: parts[0],
+        category: parts[1],
+        albumName: parts.slice(2).join('/')
+      };
+    } else {
+      // 位于角色目录根下，没有指定标准子分类，视为“未分类”
+      return {
+        role: parts[0],
+        category: '未分类',
+        albumName: parts[1]
+      };
+    }
+  }
+}
 function buildCanonicalFolderCategoryTags(folderTag){
   const info=parseFolderCategoryName(folderTag);
   if(!info?.parent||!info?.child) return [folderTag].filter(Boolean);
@@ -2536,15 +2570,28 @@ async function copyDirectoryRecursive(srcDir, destDir, options={}){
 }
 async function moveAlbumFolderToCategory(alb, folderTag){
   if(!alb?.handle||!S.rootDirHandle) return false;
-  const currentCategory=(alb._folderRelPath||'').split('/').filter(Boolean)[0]||'';
+  const pathInfo = parseFolderRelPath(alb._folderRelPath || alb.name);
+  const currentCategory = pathInfo.category;
   if(currentCategory===folderTag) return false;
+  
   const srcRel = alb._folderRelPath || alb.name;
-  const srcParts=srcRel.split('/').filter(Boolean);
-  const srcName=srcParts.pop();
-  if(!srcName||srcParts.length===0) return false;
-  const srcParent=await resolveDirectoryHandleByRelPath(S.rootDirHandle, srcParts.join('/'));
-  const srcDir=await srcParent.getDirectoryHandle(srcName);
-  const destDir = await S.rootDirHandle.getDirectoryHandle(folderTag, {create:true});
+  const srcParts = srcRel.split('/').filter(Boolean);
+  const srcName = srcParts.pop();
+  if(!srcName || srcParts.length === 0) return false;
+  
+  const rolePrefix = pathInfo.role;
+  const srcParent = await resolveDirectoryHandleByRelPath(S.rootDirHandle, srcParts.join('/'));
+  const srcDir = await srcParent.getDirectoryHandle(srcName);
+  
+  // unittest: const destDir = await S.rootDirHandle.getDirectoryHandle(folderTag, {create:true});
+  let destDir;
+  if (rolePrefix) {
+    const destParent = await S.rootDirHandle.getDirectoryHandle(rolePrefix, {create:true});
+    destDir = await destParent.getDirectoryHandle(folderTag, {create:true});
+  } else {
+    destDir = await S.rootDirHandle.getDirectoryHandle(folderTag, {create:true});
+  }
+  
   let destName=srcName, i=1;
   let newDir=null;
   try{
@@ -2565,7 +2612,13 @@ async function moveAlbumFolderToCategory(alb, folderTag){
   await srcParent.removeEntry(srcName, {recursive:true});
   alb.handle=newDir;
   alb.name=destName;
-  alb._folderRelPath = `${folderTag}/${destName}`;
+  
+  // unittest: alb._folderRelPath = `${folderTag}/${destName}`;
+  if (rolePrefix) {
+    alb._folderRelPath = `${rolePrefix}/${folderTag}/${destName}`;
+  } else {
+    alb._folderRelPath = `${folderTag}/${destName}`;
+  }
   return true;
 }
 async function setPrimaryFolderCategoryTag(alb, folderTag){
@@ -2573,7 +2626,9 @@ async function setPrimaryFolderCategoryTag(alb, folderTag){
   if(!isStandardSecondLevelFolderTag(folderTag)) return false;
   const existingPrimary = getPrimaryFolderCategoryTag(alb);
   if(existingPrimary===folderTag) return false;
-  const currentCategory=(alb._folderRelPath||'').split('/').filter(Boolean)[0]||'';
+  const pathInfo = parseFolderRelPath(alb._folderRelPath || alb.name);
+  const currentCategory = pathInfo.category || '未分类';
+  
   const nextTags=(alb.tags||[]).filter(t=>!isStandardSecondLevelFolderTag(t)).filter(t=>{
     if(!t.includes('/')) return !preferredFolderCategoryOrder.includes(t);
     return !STANDARD_SECOND_LEVEL_FOLDERS.some(ft=>t===`${parseFolderCategoryName(ft)?.parent}/${ft}`);
