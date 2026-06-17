@@ -35,18 +35,27 @@ Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue
 
 Write-Host "[2/5] 构建子程序二进制组件..."
 Write-Host "-> 正在构建 ig_download.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build --onefile ig_download.py
+py -3 -m PyInstaller --noconfirm --clean --distpath dist/ig_download --workpath build/ig_download --onefile ig_download.py
 Write-Host "-> 正在构建 xhs_download.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build --onefile xhs_download.py
+py -3 -m PyInstaller --noconfirm --clean --distpath dist/xhs_download --workpath build/xhs_download --onefile xhs_download.py
 Write-Host "-> 正在构建 flat_convert.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build --onefile flat_convert.py
+py -3 -m PyInstaller --noconfirm --clean --distpath dist/flat_convert --workpath build/flat_convert --onefile flat_convert.py
 Write-Host "-> 正在构建 hhcat_convert.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build --onefile hhcat_convert.py
+py -3 -m PyInstaller --noconfirm --clean --distpath dist/hhcat_convert --workpath build/hhcat_convert --onefile hhcat_convert.py
 Write-Host "-> 正在构建 APP - deep-translator.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build --onefile "APP - deep-translator.py"
+py -3 -m PyInstaller --noconfirm --clean --distpath dist/deep_translator --workpath build/deep_translator --onefile "APP - deep-translator.py"
+
+# 统一收集子程序到 dist 目录
+New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+Copy-Item "dist/ig_download/ig_download.exe" "dist/ig_download.exe" -Force
+Copy-Item "dist/xhs_download/xhs_download.exe" "dist/xhs_download.exe" -Force
+Copy-Item "dist/flat_convert/flat_convert.exe" "dist/flat_convert.exe" -Force
+Copy-Item "dist/hhcat_convert/hhcat_convert.exe" "dist/hhcat_convert.exe" -Force
+Copy-Item "dist/deep_translator/APP - deep-translator.exe" "dist/APP - deep-translator.exe" -Force
 
 Write-Host "[3/5] 构建主程序单文件 EXE..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build $specFile
+# 注意：主程序构建不可带 --clean，否则会清空我们刚刚收集的子程序
+py -3 -m PyInstaller --noconfirm --distpath dist --workpath build $specFile
 
 $exePath = Join-Path $repoRoot "dist\LocalAlbum.exe"
 if (-not (Test-Path $exePath)) {
