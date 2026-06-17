@@ -157,7 +157,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__', '/__get_server_info__', '/__video_screenshot__'):
+        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__', '/__get_server_info__', '/__video_screenshot__', '/__video_clip__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
@@ -176,6 +176,8 @@ class QuietHandler(SimpleHTTPRequestHandler):
                 result = run_add_task(data)
             elif self.path == '/__video_screenshot__':
                 result = run_video_screenshot(data)
+            elif self.path == '/__video_clip__':
+                result = run_video_clip(data)
             else:
                 result = run_ig_download(data)
             self._send_json(result, status=200 if result.get('ok') else 400)
@@ -280,6 +282,120 @@ def run_video_screenshot(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         return {'ok': False, 'error': f'截图过程发生异常: {str(e)}'}
 
+
+def run_video_clip(payload: dict[str, Any]) -> dict[str, Any]:
+    video_path_str = str(payload.get('path') or '').strip()
+    start_time = str(payload.get('start') or '').strip()
+    end_time = str(payload.get('end') or '').strip()
+    reencode = bool(payload.get('reencode'))
+
+    if not video_path_str:
+        return {'ok': False, 'error': '视频路径不能为空'}
+    if not start_time or not end_time:
+        return {'ok': False, 'error': '开始时间与结束时间不能为空'}
+
+    try:
+        video_path = Path(video_path_str)
+    except Exception:
+        return {'ok': False, 'error': '无效的视频路径'}
+
+    if not video_path.exists() or not video_path.is_file():
+        return {'ok': False, 'error': f'未找到视频文件: {video_path_str}'}
+
+    # 1. 查找 ffmpeg 可执行文件
+    ffmpeg_cmd = None
+
+    # 1.1 查找打包环境释放目录中的 ffmpeg.exe
+    if getattr(sys, 'frozen', False):
+        mei = getattr(sys, '_MEIPASS', None)
+        if mei:
+            bundled = Path(mei) / 'ffmpeg.exe'
+            if bundled.exists():
+                ffmpeg_cmd = str(bundled)
+
+    # 1.2 查找当前执行目录或视频同级目录下是否有 ffmpeg.exe
+    if not ffmpeg_cmd:
+        candidates = [
+            resolve_launch_dir() / 'ffmpeg.exe',
+            video_path.parent / 'ffmpeg.exe',
+            ROOT / 'ffmpeg.exe'
+        ]
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                ffmpeg_cmd = str(candidate)
+                break
+
+    # 1.3 查找系统环境变量中的 ffmpeg
+    if not ffmpeg_cmd:
+        sys_ffmpeg = shutil.which('ffmpeg')
+        if sys_ffmpeg:
+            ffmpeg_cmd = sys_ffmpeg
+
+    if not ffmpeg_cmd:
+        return {
+            'ok': False,
+            'error': '未在安装包或系统中检测到 ffmpeg。'
+        }
+
+    # 2. 生成合法的裁剪短视频文件名与目标路径
+    cleaned_start = start_time.replace(':', '_').replace('.', '_')
+    cleaned_end = end_time.replace(':', '_').replace('.', '_')
+    video_dir = video_path.parent
+    video_stem = video_path.stem
+    output_filename = f"{video_stem}_clip_{cleaned_start}_to_{cleaned_end}.mp4"
+    output_path = video_dir / output_filename
+
+    # 3. 组装 FFmpeg 命令并执行
+    if not reencode:
+        cmd = [
+            ffmpeg_cmd,
+            '-y',
+            '-ss', start_time,
+            '-to', end_time,
+            '-i', str(video_path),
+            '-c', 'copy',
+            str(output_path)
+        ]
+    else:
+        cmd = [
+            ffmpeg_cmd,
+            '-y',
+            '-ss', start_time,
+            '-to', end_time,
+            '-i', str(video_path),
+            '-c:v', 'libx264',
+            '-preset', 'superfast',
+            '-crf', '22',
+            '-c:a', 'aac',
+            str(output_path)
+        ]
+
+    creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    startupinfo = None
+    if hasattr(subprocess, 'STARTUPINFO'):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            timeout=35
+        )
+        if proc.returncode == 0:
+            return {'ok': True, 'filename': output_filename, 'path': str(output_path)}
+        else:
+            err_msg = proc.stderr or proc.stdout or '未知错误'
+            return {'ok': False, 'error': f'FFmpeg 裁剪失败: {err_msg.strip()}'}
+    except subprocess.TimeoutExpired:
+        return {'ok': False, 'error': 'FFmpeg 裁剪执行超时'}
+    except Exception as e:
+        return {'ok': False, 'error': f'裁剪过程发生异常: {str(e)}'}
 
 
 def make_url(port: int) -> str:

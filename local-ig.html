@@ -1465,6 +1465,26 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
         <button class="lbVideoShotSubmit" id="btnVideoShotConfirm">确认截图</button>
         <div id="lbVideoShotStatus" class="lbVideoShotStatus" style="display:none;"></div>
       </div>
+      <div id="lbVideoClipWrap" class="lbVideoShotWrap" style="display:none; border-color: rgba(0, 149, 246, 0.3);">
+        <div class="lbVideoShotHeader">✂️ 视频片段裁剪 (FFmpeg)</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">
+          共截取: <span id="lbVideoClipDuration" style="color:var(--accent); font-weight:bold;">0.00</span> 秒
+        </div>
+        <div class="lbVideoShotRow">
+          <input type="text" id="lbVideoClipStart" placeholder="起点: 00:00:00.000" value="00:00:00.000">
+          <button class="lbVideoShotBtn" id="btnVideoClipStartCap" title="抓取当前作为起点时间">📍 起点</button>
+        </div>
+        <div class="lbVideoShotRow">
+          <input type="text" id="lbVideoClipEnd" placeholder="终点: 00:00:00.000" value="00:00:00.000">
+          <button class="lbVideoShotBtn" id="btnVideoClipEndCap" title="抓取当前作为终点时间">📍 终点</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:2px;">
+          <input type="checkbox" id="chkVideoClipReencode" style="cursor:pointer;">
+          <label for="chkVideoClipReencode" style="cursor:pointer;" title="如果裁剪出的视频开头黑屏卡死，请勾选此项重试">启用精准重编码 (防卡顿黑屏)</label>
+        </div>
+        <button class="lbVideoShotSubmit" id="btnVideoClipConfirm" style="margin-top:4px;">确认裁剪</button>
+        <div id="lbVideoClipStatus" class="lbVideoShotStatus" style="display:none; margin-top:4px;"></div>
+      </div>
       <div class="lbCaptionWrap">
         <span class="lbCaptionIcon" id="lbCaptionIcon">✏️</span>
         <textarea class="lbCaption" id="lbCaption" rows="1" placeholder="写下这张照片的故事…"></textarea>
@@ -5324,6 +5344,7 @@ function renderLB(){
   if(!photo) return;
   const lbVid=$('lbVideo');
   const shotWrap=$('lbVideoShotWrap');
+  const clipWrap=$('lbVideoClipWrap');
   if(photo.isVideo){
     if(!photo.url) photo.url=URL.createObjectURL(photo.file);
     if(lbVid.src!==photo.url){lbVid.src=photo.url;}
@@ -5338,11 +5359,20 @@ function renderLB(){
       const statusEl=$('lbVideoShotStatus');
       if(statusEl){statusEl.style.display='none';statusEl.className='lbVideoShotStatus';}
     }
+    if(clipWrap){
+      clipWrap.style.display='flex';
+      $('lbVideoClipStart').value='00:00:00.000';
+      $('lbVideoClipEnd').value='00:00:00.000';
+      $('lbVideoClipDuration').textContent='0.00';
+      const clipStatusEl=$('lbVideoClipStatus');
+      if(clipStatusEl){clipStatusEl.style.display='none';clipStatusEl.className='lbVideoShotStatus';}
+    }
   } else {
     lbVid.pause();lbVid.style.display='none';lbVid.src='';
     if(!photo.url) photo.url=URL.createObjectURL(photo.file);
     lbImg.src=photo.url;lbImg.style.display='';
     if(shotWrap) shotWrap.style.display='none';
+    if(clipWrap) clipWrap.style.display='none';
   }
   lbCounter.textContent=`${idx+1} / ${alb.photos.length}`;
   lbDate.textContent=fmtDate(photo.date);
@@ -6238,6 +6268,137 @@ function formatVideoTime(seconds) {
     shotStatus.textContent = msg;
     shotStatus.style.display = 'block';
     shotStatus.className = 'lbVideoShotStatus ' + type;
+  }
+})();
+
+// 视频裁剪逻辑绑定
+(function(){
+  const btnStartCap = $('btnVideoClipStartCap');
+  const btnEndCap = $('btnVideoClipEndCap');
+  const startInput = $('lbVideoClipStart');
+  const endInput = $('lbVideoClipEnd');
+  const btnConfirm = $('btnVideoClipConfirm');
+  const clipStatus = $('lbVideoClipStatus');
+
+  function parseTimeToSeconds(timeStr) {
+    timeStr = timeStr.trim();
+    if (!timeStr) return 0;
+    if (/^\d+(\.\d+)?$/.test(timeStr)) return parseFloat(timeStr);
+    const parts = timeStr.split(':');
+    if (parts.length === 3) {
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      const sParts = parts[2].split('.');
+      const s = parseInt(sParts[0], 10) || 0;
+      const ms = sParts.length > 1 ? parseInt(sParts[1].padEnd(3, '0').slice(0, 3), 10) || 0 : 0;
+      return h * 3600 + m * 60 + s + ms / 1000;
+    }
+    if (parts.length === 2) {
+      const m = parseInt(parts[0], 10) || 0;
+      const sParts = parts[1].split('.');
+      const s = parseInt(sParts[0], 10) || 0;
+      const ms = sParts.length > 1 ? parseInt(sParts[1].padEnd(3, '0').slice(0, 3), 10) || 0 : 0;
+      return m * 60 + s + ms / 1000;
+    }
+    return 0;
+  }
+
+  function updateDuration() {
+    const t1 = parseTimeToSeconds(startInput.value);
+    const t2 = parseTimeToSeconds(endInput.value);
+    const diff = Math.max(0, t2 - t1);
+    $('lbVideoClipDuration').textContent = diff.toFixed(2);
+  }
+
+  if (btnStartCap) {
+    btnStartCap.addEventListener('click', () => {
+      const vid = $('lbVideo');
+      if (vid) {
+        startInput.value = formatVideoTime(vid.currentTime);
+        updateDuration();
+      }
+    });
+  }
+
+  if (btnEndCap) {
+    btnEndCap.addEventListener('click', () => {
+      const vid = $('lbVideo');
+      if (vid) {
+        endInput.value = formatVideoTime(vid.currentTime);
+        updateDuration();
+      }
+    });
+  }
+
+  [startInput, endInput].forEach(el => {
+    if (el) {
+      el.addEventListener('input', updateDuration);
+    }
+  });
+
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', async () => {
+      const alb = S.currentAlbum;
+      const idx = S.currentIdx;
+      const photo = alb?.photos?.[idx];
+      if (!alb || !photo || !photo.isVideo) return;
+
+      const tStart = startInput.value.trim();
+      const tEnd = endInput.value.trim();
+
+      if (!tStart || !tEnd) {
+        showClipStatus('起点和终点时间不能为空', 'error');
+        return;
+      }
+
+      const secStart = parseTimeToSeconds(tStart);
+      const secEnd = parseTimeToSeconds(tEnd);
+      if (secStart >= secEnd) {
+        showClipStatus('起点时间不能晚于或等于终点时间', 'error');
+        return;
+      }
+
+      const reencode = $('chkVideoClipReencode').checked;
+
+      btnConfirm.disabled = true;
+      showClipStatus(reencode ? '正在重编码剪辑中，请稍候...' : '正在极速裁剪中，请稍候...', '');
+
+      try {
+        const absPath = getPhotoPath(alb, photo);
+        const res = await fetch('/__video_clip__', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: absPath,
+            start: tStart,
+            end: tEnd,
+            reencode: reencode
+          })
+        });
+        const result = await res.json();
+        if (result.ok) {
+          showClipStatus(`✓ 裁剪成功！已存入同级目录: ${result.filename}`, 'success');
+          setTimeout(() => {
+            if (clipStatus.textContent.includes('✓')) {
+              clipStatus.style.display = 'none';
+            }
+          }, 5000);
+        } else {
+          showClipStatus(`裁剪失败: ${result.error || '未知错误'}`, 'error');
+        }
+      } catch (err) {
+        showClipStatus(`网络请求失败: ${err.message}`, 'error');
+      } finally {
+        btnConfirm.disabled = false;
+      }
+    });
+  }
+
+  function showClipStatus(msg, type) {
+    if (!clipStatus) return;
+    clipStatus.textContent = msg;
+    clipStatus.style.display = 'block';
+    clipStatus.className = 'lbVideoShotStatus ' + type;
   }
 })();
 
