@@ -157,7 +157,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:
-        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__', '/__get_server_info__'):
+        if self.path not in ('/__open_folder__', '/__run_ig_download__', '/__ig_download_status__', '/__run_add_task__', '/__get_server_info__', '/__video_screenshot__'):
             self._send_json({'ok': False, 'error': 'not_found'}, status=404)
             return
         try:
@@ -174,11 +174,112 @@ class QuietHandler(SimpleHTTPRequestHandler):
                 result = get_ig_download_status(pid)
             elif self.path == '/__run_add_task__':
                 result = run_add_task(data)
+            elif self.path == '/__video_screenshot__':
+                result = run_video_screenshot(data)
             else:
                 result = run_ig_download(data)
             self._send_json(result, status=200 if result.get('ok') else 400)
         except Exception as exc:
             self._send_json({'ok': False, 'error': str(exc)}, status=500)
+
+
+def run_video_screenshot(payload: dict[str, Any]) -> dict[str, Any]:
+    video_path_str = str(payload.get('path') or '').strip()
+    time_offset = str(payload.get('time') or '').strip()
+
+    if not video_path_str:
+        return {'ok': False, 'error': '视频路径不能为空'}
+    if not time_offset:
+        return {'ok': False, 'error': '截图时间不能为空'}
+
+    try:
+        video_path = Path(video_path_str)
+    except Exception:
+        return {'ok': False, 'error': '无效的视频路径'}
+
+    if not video_path.exists() or not video_path.is_file():
+        return {'ok': False, 'error': f'未找到视频文件: {video_path_str}'}
+
+    # 1. 查找 ffmpeg 可执行文件
+    ffmpeg_cmd = None
+
+    # 1.1 查找打包环境释放目录中的 ffmpeg.exe
+    if getattr(sys, 'frozen', False):
+        mei = getattr(sys, '_MEIPASS', None)
+        if mei:
+            bundled = Path(mei) / 'ffmpeg.exe'
+            if bundled.exists():
+                ffmpeg_cmd = str(bundled)
+
+    # 1.2 查找当前执行目录或视频同级目录下是否有 ffmpeg.exe
+    if not ffmpeg_cmd:
+        candidates = [
+            resolve_launch_dir() / 'ffmpeg.exe',
+            video_path.parent / 'ffmpeg.exe',
+            ROOT / 'ffmpeg.exe'
+        ]
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                ffmpeg_cmd = str(candidate)
+                break
+
+    # 1.3 查找系统环境变量中的 ffmpeg
+    if not ffmpeg_cmd:
+        sys_ffmpeg = shutil.which('ffmpeg')
+        if sys_ffmpeg:
+            ffmpeg_cmd = sys_ffmpeg
+
+    if not ffmpeg_cmd:
+        return {
+            'ok': False,
+            'error': '未在安装包或系统中检测到 ffmpeg。请确保系统已安装 ffmpeg 并配置到环境变量中。'
+        }
+
+    # 2. 生成截图文件名与目标路径
+    cleaned_time = time_offset.replace(':', '_').replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
+    video_dir = video_path.parent
+    video_stem = video_path.stem
+    output_filename = f"{video_stem}_shot_{cleaned_time}.png"
+    output_path = video_dir / output_filename
+
+    # 3. 组装 FFmpeg 命令并执行
+    cmd = [
+        ffmpeg_cmd,
+        '-y',
+        '-ss', time_offset,
+        '-i', str(video_path),
+        '-frames:v', '1',
+        '-pix_fmt', 'rgb24',
+        str(output_path)
+    ]
+
+    creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    startupinfo = None
+    if hasattr(subprocess, 'STARTUPINFO'):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= getattr(subprocess, 'STARTF_USESHOWWINDOW', 0)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            timeout=15
+        )
+        if proc.returncode == 0:
+            return {'ok': True, 'filename': output_filename, 'path': str(output_path)}
+        else:
+            err_msg = proc.stderr or proc.stdout or '未知错误'
+            return {'ok': False, 'error': f'FFmpeg 截图失败: {err_msg.strip()}'}
+    except subprocess.TimeoutExpired:
+        return {'ok': False, 'error': 'FFmpeg 截图执行超时'}
+    except Exception as e:
+        return {'ok': False, 'error': f'截图过程发生异常: {str(e)}'}
+
 
 
 def make_url(port: int) -> str:

@@ -291,6 +291,91 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .lbCaption.empty{background:rgba(255,255,255,.02)}
 .lbCaption::placeholder{color:#777}
 
+/* ── Video Screenshot ────────────────────────────────────── */
+.lbVideoShotWrap {
+  background: rgba(255,255,255,0.015);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lbVideoShotHeader {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.lbVideoShotRow {
+  display: flex;
+  gap: 6px;
+}
+.lbVideoShotRow input {
+  flex: 1;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  font-family: monospace;
+}
+.lbVideoShotRow input:focus {
+  border-color: var(--accent);
+}
+.lbVideoShotBtn {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.lbVideoShotBtn:hover {
+  background: #252525;
+}
+.lbVideoShotSubmit {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  text-align: center;
+}
+.lbVideoShotSubmit:hover {
+  opacity: 0.9;
+}
+.lbVideoShotSubmit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lbVideoShotStatus {
+  font-size: 12px;
+  padding: 6px;
+  border-radius: 6px;
+  text-align: center;
+}
+.lbVideoShotStatus.success {
+  background: rgba(62,180,137,0.15);
+  color: var(--green);
+}
+.lbVideoShotStatus.error {
+  background: rgba(255,74,74,0.15);
+  color: #ff4a4a;
+}
+
 /* ── Per-photo action buttons ────────────────────────────── */
 .postActions{
   position:absolute;top:8px;right:8px;
@@ -1371,6 +1456,15 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
       <button class="lbNav r" id="lbNext">›</button>
     </div>
     <div class="lbFoot">
+      <div id="lbVideoShotWrap" class="lbVideoShotWrap" style="display:none;">
+        <div class="lbVideoShotHeader">🎬 视频截图 (FFmpeg)</div>
+        <div class="lbVideoShotRow">
+          <input type="text" id="lbVideoShotTime" placeholder="例如: 00:00:25.600 或 25.6" value="00:00:00.000">
+          <button class="lbVideoShotBtn" id="btnVideoShotCapture" title="抓取当前视频播放进度">📍 当前时间</button>
+        </div>
+        <button class="lbVideoShotSubmit" id="btnVideoShotConfirm">确认截图</button>
+        <div id="lbVideoShotStatus" class="lbVideoShotStatus" style="display:none;"></div>
+      </div>
       <div class="lbCaptionWrap">
         <span class="lbCaptionIcon" id="lbCaptionIcon">✏️</span>
         <textarea class="lbCaption" id="lbCaption" rows="1" placeholder="写下这张照片的故事…"></textarea>
@@ -5229,6 +5323,7 @@ function renderLB(){
   const alb=S.currentAlbum,idx=S.currentIdx,photo=alb.photos[idx];
   if(!photo) return;
   const lbVid=$('lbVideo');
+  const shotWrap=$('lbVideoShotWrap');
   if(photo.isVideo){
     if(!photo.url) photo.url=URL.createObjectURL(photo.file);
     if(lbVid.src!==photo.url){lbVid.src=photo.url;}
@@ -5237,10 +5332,17 @@ function renderLB(){
       lbVid.poster=photo.poster.url;
     }
     lbImg.style.display='none';lbVid.style.display='';
+    if(shotWrap){
+      shotWrap.style.display='flex';
+      $('lbVideoShotTime').value='00:00:00.000';
+      const statusEl=$('lbVideoShotStatus');
+      if(statusEl){statusEl.style.display='none';statusEl.className='lbVideoShotStatus';}
+    }
   } else {
     lbVid.pause();lbVid.style.display='none';lbVid.src='';
     if(!photo.url) photo.url=URL.createObjectURL(photo.file);
     lbImg.src=photo.url;lbImg.style.display='';
+    if(shotWrap) shotWrap.style.display='none';
   }
   lbCounter.textContent=`${idx+1} / ${alb.photos.length}`;
   lbDate.textContent=fmtDate(photo.date);
@@ -6063,6 +6165,81 @@ lbCaption.addEventListener('input',()=>{
   writePhotoCaptionSidecar(alb, photo, lbCaption.value);
   scheduleWrite(alb);
 });
+
+function formatVideoTime(seconds) {
+  if (isNaN(seconds) || seconds < 0) return '00:00:00.000';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+}
+
+// 视频截图逻辑绑定
+(function(){
+  const btnCapture = $('btnVideoShotCapture');
+  const btnConfirm = $('btnVideoShotConfirm');
+  const shotTimeInput = $('lbVideoShotTime');
+  const shotStatus = $('lbVideoShotStatus');
+
+  if (btnCapture) {
+    btnCapture.addEventListener('click', () => {
+      const vid = $('lbVideo');
+      if (vid) {
+        shotTimeInput.value = formatVideoTime(vid.currentTime);
+      }
+    });
+  }
+
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', async () => {
+      const alb = S.currentAlbum;
+      const idx = S.currentIdx;
+      const photo = alb?.photos?.[idx];
+      if (!alb || !photo || !photo.isVideo) return;
+
+      const timeVal = shotTimeInput.value.trim();
+      if (!timeVal) {
+        showShotStatus('请输入时间码或秒数', 'error');
+        return;
+      }
+
+      btnConfirm.disabled = true;
+      showShotStatus('正在截取视频帧...', '');
+
+      try {
+        const absPath = getPhotoPath(alb, photo);
+        const res = await fetch('/__video_screenshot__', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: absPath, time: timeVal })
+        });
+        const result = await res.json();
+        if (result.ok) {
+          showShotStatus(`✓ 截图成功！已存入同级目录: ${result.filename}`, 'success');
+          setTimeout(() => {
+            if (shotStatus.textContent.includes('✓')) {
+              shotStatus.style.display = 'none';
+            }
+          }, 5000);
+        } else {
+          showShotStatus(`失败: ${result.error || '未知错误'}`, 'error');
+        }
+      } catch (err) {
+        showShotStatus(`网络请求失败: ${err.message}`, 'error');
+      } finally {
+        btnConfirm.disabled = false;
+      }
+    });
+  }
+
+  function showShotStatus(msg, type) {
+    if (!shotStatus) return;
+    shotStatus.textContent = msg;
+    shotStatus.style.display = 'block';
+    shotStatus.className = 'lbVideoShotStatus ' + type;
+  }
+})();
 
 // ── Add Posts Modal ──────────────────────────────────────────────────────
 (function(){

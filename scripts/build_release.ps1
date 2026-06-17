@@ -12,8 +12,8 @@ $appName = "LocalAlbum"
 $installerExeName = "安装本地IG.exe"
 $specFile = "LocalAlbum.spec"
 
-if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-    throw "未找到 Python 启动器 py。请先安装 Python 3。"
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    throw "未找到 Python。请先安装 Python 3。"
 }
 
 if (-not (Test-Path $specFile)) {
@@ -36,15 +36,15 @@ Remove-Item -Recurse -Force "dist_bins" -ErrorAction SilentlyContinue
 
 Write-Host "[2/5] 构建子程序二进制组件..."
 Write-Host "-> 正在构建 ig_download.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist/ig_download --workpath build/ig_download --onefile ig_download.py
+python -m PyInstaller --noconfirm --clean --distpath dist/ig_download --workpath build/ig_download --onefile ig_download.py
 Write-Host "-> 正在构建 xhs_download.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist/xhs_download --workpath build/xhs_download --onefile xhs_download.py
+python -m PyInstaller --noconfirm --clean --distpath dist/xhs_download --workpath build/xhs_download --onefile xhs_download.py
 Write-Host "-> 正在构建 flat_convert.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist/flat_convert --workpath build/flat_convert --onefile flat_convert.py
+python -m PyInstaller --noconfirm --clean --distpath dist/flat_convert --workpath build/flat_convert --onefile flat_convert.py
 Write-Host "-> 正在构建 hhcat_convert.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist/hhcat_convert --workpath build/hhcat_convert --onefile hhcat_convert.py
+python -m PyInstaller --noconfirm --clean --distpath dist/hhcat_convert --workpath build/hhcat_convert --onefile hhcat_convert.py
 Write-Host "-> 正在构建 APP - deep-translator.exe..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist/deep_translator --workpath build/deep_translator --onefile "APP - deep-translator.py"
+python -m PyInstaller --noconfirm --clean --distpath dist/deep_translator --workpath build/deep_translator --onefile "APP - deep-translator.py"
 
 # 统一收集子组件到 dist_bins 临时存放目录中
 New-Item -ItemType Directory -Path "dist_bins" -Force | Out-Null
@@ -55,7 +55,7 @@ Copy-Item "dist/hhcat_convert/hhcat_convert.exe" "dist_bins/hhcat_convert.exe" -
 Copy-Item "dist/deep_translator/APP - deep-translator.exe" "dist_bins/APP - deep-translator.exe" -Force
 
 Write-Host "[3/5] 构建主程序单文件 EXE..."
-py -3 -m PyInstaller --noconfirm --clean --distpath dist --workpath build $specFile
+python -m PyInstaller --noconfirm --clean --distpath dist --workpath build $specFile
 
 # 构建完主程序后删除临时二进制目录
 Remove-Item -Recurse -Force "dist_bins" -ErrorAction SilentlyContinue

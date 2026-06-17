@@ -1,0 +1,37 @@
+
+=== launch 2026-05-23 20:04:30 ===
+
+────────────────────────────────────────────────
+  📸  本地相册 · IG 下载器
+────────────────────────────────────────────────
+  目标账号: @d_sfyl0818
+  保存位置: F:\Download\本地IG\d_sfyl0818
+────────────────────────────────────────────────
+
+🔑  使用手动 sessionid…
+✓ sessionid 已设置，登入用户: @zzxzzz668
+
+🔍  获取账号信息…
+⚠️  无法读取帖子总数（mediacount）：400 Bad Request - "fail" status, message "invalid request" when accessing https://www.instagram.com/graphql/query
+    将切换为降级模式继续下载（建议同时提供 --count）
+⚠️  GraphQL 接口受限：400 Bad Request - "fail" status, message "invalid request" when accessing https://www.instagram.com/graphql/query
+    尝试切换到移动端 API 降级模式…
+✓  降级模式就绪，获取到 1 条，准备下载
+
+
+[1/1] ████████████████████ 100%  2025-02-02  /p/DFixvFJMHSF
+  ↳ 图片 1/1  (146 KB)
+  ✓ good night💗💤
+  ✓  已下載（共 1 條）
+
+────────────────────────────────────────────────
+  ✅  完成  下载 1 | 已有 0 | 失败 0
+────────────────────────────────────────────────
+
+  📂  文件夹已自动打开: F:\Download\本地IG\d_sfyl0818
+  🔗  file:///F:/Download/%E6%9C%AC%E5%9C%B0IG/d_sfyl0818
+
+  📱  在本地相册中查看:
+      1. 用 Chrome / Edge 打开 local-ig.html
+      2. 点「选择文件夹」，选择上方目录
+

@@ -1,4 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
+import shutil
+
+ffmpeg_path = shutil.which('ffmpeg')
+extra_binaries = []
+if ffmpeg_path:
+    print(f"[*] Found ffmpeg.exe at: {ffmpeg_path}, embedding into release!")
+    extra_binaries.append((ffmpeg_path, '.'))
+else:
+    print("[!] Warning: ffmpeg.exe not found in PATH!")
 
 
 a = Analysis(
@@ -10,7 +19,7 @@ a = Analysis(
         ('dist_bins/flat_convert.exe', '.'),
         ('dist_bins/hhcat_convert.exe', '.'),
         ('dist_bins/APP - deep-translator.exe', '.'),
-    ],
+    ] + extra_binaries,
     datas=[
         ('ig_download.py', '.'),
         ('xhs_download.py', '.'),
