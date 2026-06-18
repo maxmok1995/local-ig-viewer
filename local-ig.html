@@ -2523,12 +2523,16 @@ function buildCanonicalFolderCategoryTags(folderTag){
 }
 function getPrimaryFolderCategoryTag(alb){
   const tags=alb?.tags||[];
+  const effectiveRoles = getEffectiveHierarchy()
+    .filter(g => !g._custom)
+    .map(g => tagName(g.l1));
+
   for(const folderTag of STANDARD_SECOND_LEVEL_FOLDERS){
     const info=parseFolderCategoryName(folderTag);
-    // 兼容可能带有角色前缀的标签形式，例如 tags 包含 "角色1/吃喝-午"
+    // 兼容带物理角色前缀的标签形式，严格进行拼接匹配，防止被普通自定义标签误伤
     const hasTag = tags.some(t => {
       const ts = String(t || '').trim();
-      return ts === folderTag || ts.endsWith('/' + folderTag);
+      return ts === folderTag || effectiveRoles.some(role => ts === `${role}/${folderTag}`);
     });
     if(hasTag) return folderTag;
     
@@ -2536,7 +2540,9 @@ function getPrimaryFolderCategoryTag(alb){
       const parentHasTag = tags.some(t => {
         const ts = String(t || '').trim();
         const target = `${info.parent}/${folderTag}`;
-        return ts === target || ts.endsWith('/' + target);
+        return ts === target || effectiveRoles.some(role => 
+          ts === `${role}/${target}` || ts === `${role}/${info.parent}/${folderTag}`
+        );
       });
       if(parentHasTag) return folderTag;
     }
@@ -2593,8 +2599,8 @@ async function moveAlbumFolderToCategory(alb, folderTag){
   if(!srcName) return false;
   
   let rolePrefix = '';
-  // 优先从 tags 提取有效的角色 L1 标签，防范 pathInfo.role 为 '未分类' 或空时的判定缺失
-  const effectiveRoles = getEffectiveHierarchy().map(g => tagName(g.l1));
+  // 优先从 tags 提取有效的角色 L1 标签，防范 pathInfo.role 为 '未分类' 或空时的判定缺失，并排除普通自定义标签
+  const effectiveRoles = getEffectiveHierarchy().filter(g => !g._custom).map(g => tagName(g.l1));
   const foundRole = effectiveRoles.find(r => 
     (alb.tags || []).some(t => {
       const ts = String(t || '').trim();
@@ -2603,7 +2609,7 @@ async function moveAlbumFolderToCategory(alb, folderTag){
   );
   if (foundRole) {
     rolePrefix = foundRole;
-  } else if (pathInfo.role && pathInfo.role !== '未分类' && !STANDARD_SECOND_LEVEL_FOLDERS.includes(pathInfo.role)) {
+  } else if (pathInfo.role && pathInfo.role !== '未分类' && !STANDARD_SECOND_LEVEL_FOLDERS.includes(pathInfo.role) && effectiveRoles.includes(pathInfo.role)) {
     rolePrefix = pathInfo.role;
   }
   const srcParent = srcParts.length === 0 
@@ -2659,8 +2665,8 @@ async function setPrimaryFolderCategoryTag(alb, folderTag){
   
   // unittest: (alb.tags||[]).filter(t=>!isStandardSecondLevelFolderTag(t))
   // unittest: nextTags.push(folderTag)
-  // 找出当前相册角色，清洗所有旧的文件夹二级分类标签（兼容多角色带前缀）并添加规范化新标签
-  const effectiveRoles = getEffectiveHierarchy().map(g => tagName(g.l1));
+  // 找出当前相册角色，清洗所有旧的文件夹二级分类标签（兼容多角色带前缀）并添加规范化新标签，排除普通自定义标签
+  const effectiveRoles = getEffectiveHierarchy().filter(g => !g._custom).map(g => tagName(g.l1));
   const activeRole = effectiveRoles.find(r => 
     (alb.tags || []).some(t => {
       const ts = String(t || '').trim();

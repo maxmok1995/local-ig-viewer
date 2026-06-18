@@ -7,6 +7,12 @@
 - `MINOR`：新增功能、向下兼容
 - `MAJOR`：不兼容變更
 
+## v3.0.20 - 2026-06-18
+
+### local-ig.html
+- 修复：解决当用户在 TagManager 自定义标签中定义的一级大类名（如 `'角度'`）与系统标准物理文件夹标签名（如 `'玩乐'`）相似或与物理层级标签发生重名时，自动归档逻辑发生的严重层级解析冲突和误移库 Bug。
+- 优化：在 `getPrimaryFolderCategoryTag`、`moveAlbumFolderToCategory` 和 `setPrimaryFolderCategoryTag` 中，在解析和识别物理角色前缀 `effectiveRoles` 时过滤排除了带 `_custom: true` 的非物理自定义标签；同时严格限定只有“有效物理角色前缀 + 目标分类”等格式的拼接才能配对成功，彻底防范了非物理自定义普通标签（如 `角度/玩乐`）对硬盘物理自动分类移库机制的干扰。
+
 ## v3.0.19 - 2026-06-18
 
 ### local-ig.html
