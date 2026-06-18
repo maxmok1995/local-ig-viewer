@@ -3449,6 +3449,45 @@ function recoverNotesFromMemory(){
   }
   if(count>0) toast(`已同步 ${count} 个相册的本地备注与标签`);
 }
+async function autoFixStaleAlbumFolderPaths() {
+  if (!S.albums || S.albums.length === 0 || !S.rootDirHandle) return 0;
+  
+  let fixedCount = 0;
+  for (const alb of S.albums) {
+    if (!alb.handle) continue;
+    
+    const folderTag = getPrimaryFolderCategoryTag(alb);
+    if (!folderTag) continue;
+    
+    const pathInfo = parseFolderRelPath(alb._folderRelPath || alb.name);
+    const currentCategory = pathInfo.category || '未分类';
+    
+    // 如果物理路径所属的分类与当前的文件夹标签不一致，进行物理移动归位
+    if (currentCategory !== folderTag) {
+      try {
+        const moved = await moveAlbumFolderToCategory(alb, folderTag);
+        if (moved) {
+          fixedCount++;
+          console.log(`[自动归档] 相册 "${alb.name}" 物理路径已由 "${currentCategory}" 修正并归档到 "${folderTag}"`);
+        }
+      } catch (e) {
+        console.error(`[自动归档失败] 修正相册 "${alb.name}" 物理路径失败:`, e);
+      }
+    }
+  }
+  
+  if (fixedCount > 0) {
+    try {
+      const snapshot = buildRootIndexSnapshot(S.rootDirHandle, S.albums);
+      await writeRootIndexSnapshot(S.rootDirHandle, snapshot);
+    } catch(err) {
+      console.warn('[自动归档] 重写快照缓存失败:', err);
+    }
+    toast(`📁 已自动将 ${fixedCount} 个历史相册归档到对应的文件夹分类下`);
+  }
+  
+  return fixedCount;
+}
 
 // ── DOM ───────────────────────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
@@ -5584,6 +5623,7 @@ async function doLoadFolder(h){
     idb.set('lastFolder',h).catch(()=>{});
     S.albums=await readFolder(h);
     recoverNotesFromMemory();
+    await autoFixStaleAlbumFolderPaths();
     goHome();
   }catch(e){
     idb.set('lastFolder',null).catch(()=>{});
