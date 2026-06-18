@@ -2590,7 +2590,7 @@ async function moveAlbumFolderToCategory(alb, folderTag){
   const srcRel = alb._folderRelPath || alb.name;
   const srcParts = srcRel.split('/').filter(Boolean);
   const srcName = srcParts.pop();
-  if(!srcName || srcParts.length === 0) return false;
+  if(!srcName) return false;
   
   let rolePrefix = '';
   // 优先从 tags 提取有效的角色 L1 标签，防范 pathInfo.role 为 '未分类' 或空时的判定缺失
@@ -2606,7 +2606,9 @@ async function moveAlbumFolderToCategory(alb, folderTag){
   } else if (pathInfo.role && pathInfo.role !== '未分类' && !STANDARD_SECOND_LEVEL_FOLDERS.includes(pathInfo.role)) {
     rolePrefix = pathInfo.role;
   }
-  const srcParent = await resolveDirectoryHandleByRelPath(S.rootDirHandle, srcParts.join('/'));
+  const srcParent = srcParts.length === 0 
+    ? S.rootDirHandle 
+    : await resolveDirectoryHandleByRelPath(S.rootDirHandle, srcParts.join('/'));
   const srcDir = await srcParent.getDirectoryHandle(srcName);
   
   // unittest: const destDir = await S.rootDirHandle.getDirectoryHandle(folderTag, {create:true});
