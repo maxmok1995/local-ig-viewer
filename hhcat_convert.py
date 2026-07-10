@@ -33,6 +33,7 @@ import json
 import shutil
 import argparse
 from pathlib import Path
+import _common
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ def convert_post(post_dir: Path, caption: str, dry_run: bool) -> dict:
         for tmp, dst in tmp_renames:
             tmp.rename(dst)
         if not meta_path.exists():
-            meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding='utf-8')
+            _common.save_meta_json(post_dir, meta)
             action_log.append(f"  写入 meta.json")
     else:
         for src, dst in renames:

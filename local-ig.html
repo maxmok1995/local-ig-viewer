@@ -400,14 +400,51 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .lbActBtn:hover{background:#252525}
 
 @media(min-width: 680px) {
+  /* 💡 仿 Instagram 網頁版：詳情頁改為毛玻璃半透明遮罩，居中排列 */
+  #vLB.on {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 10, 0.72) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    gap: 12px;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  /* 💡 限制頂部 Header 的最大寬度，使其與下方的卡片對齊 */
+  #vLB .lbHdr {
+    width: 90%;
+    max-width: 1100px;
+    background: transparent;
+    border-bottom: none;
+    padding: 0;
+  }
+  /* 💡 卡片化重構：限制最大寬高，呈現高端卡片質感 */
   #vLBBody {
     flex-direction: row;
+    width: 90%;
+    max-width: 1100px;
+    height: 85vh;
+    max-height: 850px;
+    background: #121212;
+    border: 1px solid #262626;
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
   }
+  /* 💡 左側圖片展示區：使用極致深色背景，承載 Contain 模式的大圖 */
+  .lbImgArea {
+    background: #050505;
+  }
+  /* 💡 右側信息控制面板 */
   .lbFoot {
     width: 340px;
     height: 100%;
     border-top: none;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid #262626;
+    background: #121212;
     display: flex;
     flex-direction: column;
     padding: 16px;
@@ -1528,6 +1565,10 @@ body.batch-mode .albumCard.selected .selCheck::after{content:'✓';color:#fff}
           <div class="igAddLabel">IG 用戶名</div>
           <input id="igAddUser" class="igAddInp" type="text" autocomplete="off" spellcheck="false" placeholder="natgeo">
         </div>
+        <div style="margin-top: 10px;">
+          <div class="igAddLabel">Session ID（推薦，防止 429/403 限制）</div>
+          <input id="igAddIgSessionId" class="igAddInp" type="text" autocomplete="off" spellcheck="false" placeholder="從 Chrome DevTools 複製的 sessionid">
+        </div>
       </div>
       <!-- 小紅書欄位 -->
       <div class="igAddPlatform" id="igAddXhsFields" style="display:none">
@@ -1749,28 +1790,24 @@ const COUNTRY_MAP = [
 ];
 
 // ── 兩級標簽層次（L1 + L2 子項）────────────────────────────────────────────
-const TAG_HIERARCHY = [
+// ── 常用自定義推薦標籤（僅用於點擊生成與輸入推薦，非物理資料夾） ───────────────────────────
+const RECOMMENDED_CUSTOM_TAGS = [
+  // 📸 角度：拍攝角度快捷推薦，加入 Vlog 快捷項
   { l1:{zh:'📸 角度',en:'📸 Angle',th:'📸 มุมกล้อง',ja:'📸 角度',ko:'📸 각도'},
-    kw:['角度','视角','視野','摄影角度','拍摄角度','视角','มุมกล้อง','angle','pov','view'],
+    kw:['角度','视角','視野','摄影角度','拍摄角度','มุมกล้อง','angle','pov','view'],
     children:[
-      {l2:{zh:'自拍',en:'Selfie',th:'เซลฟี่',ja:'自撮り',ko:'셀카'},kw:['自拍','selfie','自撮','셀카','เซลฟี่']},
-      {l2:{zh:'第一視角',en:'POV',th:'มุมมองบุคคลที่หนึ่ง',ja:'一人称視点',ko:'1인칭 시점'},kw:['第一视角','第一視角','第一人称','第一人稱','pov','first person']},
-      {l2:{zh:'擺拍',en:'Posed',th:'โพสท่า',ja:'ポーズ',ko:'포즈'},kw:['摆拍','擺拍','pose','posing','擺姿勢','摆姿势','포즈','โพส']},
+      {l2:{zh:'自拍','zh-CN':'自拍','zh-TW':'自拍',en:'Selfie',th:'เซลฟี่',ja:'自撮り',ko:'셀카'},kw:['自拍','selfie','自撮','셀카','เซลฟี่']},
+      {l2:{zh:'第一視角','zh-CN':'第一视角','zh-TW':'第一視角',en:'POV',th:'มุมมองบุคคลที่หนึ่ง',ja:'一人称視点',ko:'1인칭 시점'},kw:['第一视角','第一視角','第一人称','第一人稱','pov','first person']},
+      {l2:{zh:'擺拍','zh-CN':'摆拍','zh-TW':'擺拍',en:'Posed',th:'โพ斯ท่า',ja:'ポーズ',ko:'포즈'},kw:['摆拍','擺拍','pose','posing','擺姿勢','摆姿势','포즈']},
+      {l2:{zh:'Vlog','zh-CN':'Vlog','zh-TW':'Vlog',en:'Vlog',th:'Vlog',ja:'Vlog',ko:'Vlog'},kw:['vlog','影片','記錄','日常记录']},
     ]
   },
-
-  { l1:{zh:'🇲🇾 馬來西亞',en:'🇲🇾 Malaysia',th:'🇲🇾 มาเลเซีย',ja:'🇲🇾 マレーシア',ko:'🇲🇾 말레이시아'},
-    kw:['馬來西亞','马来西亚','malaysia','吉隆坡','檳城','馬六甲','沙巴','kuala lumpur','penang','malacca','sabah'],
-    _alwaysShowArrow:true },
-
-  { l1:{zh:'✨ 逼格',en:'✨ Aesthetic',th:'✨ สไตล์',ja:'✨ おしゃれ',ko:'✨ 감성'},
-    kw:['逼格','aesthetic','文青','lifestyle','攝影','摄影','photography','portrait','穿搭','ootd','fashion','時尚','时尚','lookbook','街拍','藝術','艺术','art','gallery','展覽','展览','museum','博物館','博物馆'],
-    _alwaysShowArrow:true },
-
-  { l1:{zh:'👨‍👩‍👧 家人',en:'👨‍👩‍👧 Family',th:'👨‍👩‍👧 ครอบครัว',ja:'👨‍👩‍👧 家族',ko:'👨‍👩‍👧 가족'},
-    kw:['家人','family','老婆','老公','孩子','小孩','親子','亲子','媽媽','妈妈','爸爸','寶寶','宝宝','爺爺','奶奶','外公','外婆','grandma','grandpa','dad','mom','kids','baby'],
-    _alwaysShowArrow:true },
-
+  // 😍 愛好：L2 推薦改為運行時動態統計，此處僅保留大類佔位
+  { l1:{zh:'😍 愛好',en:'😍 Hobby',th:'😍 งานอดิเรก',ja:'😍 趣味',ko:'😍 취미'},
+    kw:['愛好','hobby','興趣','兴趣','喜好'],
+    _dynamicL2:true
+  },
+  // 🎉 節日：純自定義推薦標籤（不對應物理文件夾，無需物理移庫）
   { l1:{zh:'🎉 節日',en:'🎉 Festival',th:'🎉 เทศกาล',ja:'🎉 記念日',ko:'🎉 기념일'},
     kw:['節日','节日','假日','holiday','celebration','慶祝','庆祝'],
     children:[
@@ -1783,22 +1820,36 @@ const TAG_HIERARCHY = [
     ]
   },
 
+  // 🇨🇳 中國：純自定義推薦標籤（不對應物理文件夾）
+  { l1:{zh:'🇨🇳 中國',en:'🇨🇳 China',th:'🇨🇳 ประเทศจีน',ja:'🇨🇳 中国',ko:'🇨🇳 중국'},
+    kw:['中國','中国','china','北京','上海','廣州','深圳','成都','重慶','杭州','西安','南京','武漢','蘇州','苏州','廣東','广东'],
+    _useLocationAsL2:true
+  },
+  // 🇹🇼 台灣：純自定義推薦標籤（不對應物理文件夾）
+  { l1:{zh:'🇹🇼 台灣',en:'🇹🇼 Taiwan',th:'🇹🇼 ไต้หวัน',ja:'🇹🇼 台湾',ko:'🇹🇼 대만'},
+    kw:['台灣','台湾','taiwan','台北','台中','高雄','台南','新竹','宜蘭','花蓮','台東','墾丁','taipei','kaohsiung','taichung'],
+    children:[
+      {l2:{zh:'台北',en:'Taipei',th:'ไทเป',ja:'台北',ko:'타이베이'},kw:['台北','taipei']},
+      {l2:{zh:'台中',en:'Taichung',th:'ไถจง',ja:'台中',ko:'타이중'},kw:['台中','taichung']},
+      {l2:{zh:'高雄',en:'Kaohsiung',th:'เกาสง',ja:'高雄',ko:'가오슝'},kw:['高雄','kaohsiung']},
+    ]
+  },
+];
+
+const TAG_HIERARCHY = [
+
+{ l1:{zh:'👨‍👩‍👧 家人',en:'👨‍👩‍👧 Family',th:'👨‍👩‍👧 ครอบครัว',ja:'👨‍👩‍👧 家族',ko:'👨‍👩‍👧 가족'},
+    kw:['家人','family','老婆','老公','孩子','小孩','親子','亲子','媽媽','妈妈','爸爸','寶寶','宝宝','爺爺','奶奶','外公','外婆','grandma','grandpa','dad','mom','kids','baby'],
+    _alwaysShowArrow:true },
+
+
+
   { l1:{zh:'🏠 居家',en:'🏠 Home',th:'🏠 在บ้าน',ja:'🏠 おうち',ko:'🏠 홈'},
     kw:['居家','室內','室内','家裡','家里','廚房','厨房','客廳','客厅','臥室','卧室','料理','自煮','cooking','baking','烘焙','家居','佈置','布置','interior'] },
 
-  { l1:{zh:'🇨🇳 中國',en:'🇨🇳 China',th:'🇨🇳 ประเทศจีน',ja:'🇨🇳 中国',ko:'🇨🇳 중국'},
-    kw:['中國','中国','china','北京','上海','廣州','深圳','成都','重慶','杭州','西安','南京','武漢','南京','蘇州','苏州','廣東','广东'],
-    _useLocationAsL2:true
-  },
 
-  { l1:{zh:'😍 愛好',en:'😍 Hobby',th:'😍 งานอดิเรก',ja:'😍 趣味',ko:'😍 취미'},
-    kw:['愛好']
-  },
 
-  { l1:{zh:'🇹🇼 台灣',en:'🇹🇼 Taiwan',th:'🇹🇼 ไต้หวัน',ja:'🇹🇼 台湾',ko:'🇹🇼 대만'},
-    kw:['台灣','台湾','taiwan','台北','台中','高雄','台南','新竹','宜蘭','花蓮','台東','墾丁','taipei','kaohsiung','taichung'],
-    _alwaysShowArrow:true
-  },
+
 ];
 
 // ── 快速標籤（多語言）────────────────────────────────────────────────────────
@@ -1880,7 +1931,7 @@ function getEffectiveHierarchy(){
   const overrides=cfg.overrides||{};
   const extraL2=cfg.extraL2||{};
 
-  const base=[...TAG_HIERARCHY, ...buildFolderDefaultCategoryGroups()]
+  const base=[...TAG_HIERARCHY, ...RECOMMENDED_CUSTOM_TAGS, ...buildFolderDefaultCategoryGroups()]
     .filter(g=>!hiddenSet.has(tagName(g.l1)))
     .map(g=>{
       const origKey=tagName(g.l1);
@@ -2395,15 +2446,14 @@ const STANDARD_SECOND_LEVEL_FOLDERS=[
   '人-合照','人-摆拍','人-自拍',
   '住-家','住-旅店',
   '吃喝','吃喝-下午茶','吃喝-办公室','吃喝-午','吃喝-宵夜','吃喝-家','吃喝-早','吃喝-早午','吃喝-晚',
-  '备忘-IG','备忘-客户',
   '工作-出差','工作-办公室','工作-饭局',
   '未分类',
   '玩乐','玩乐-山林','玩乐-市区','玩乐-海边','玩乐-旅行',
   '行-出海','行-地铁','行-自驾','行-航班',
 ];
-const preferredFolderCategoryOrder=['人','工作','吃喝','行','住','玩乐','备忘'];
+const preferredFolderCategoryOrder=['人','工作','吃喝','行','住','玩乐','未分类'];
 const FOLDER_L1_CORES = new Set([
-  '人', '工作', '吃喝', '行', '住', '玩乐', '玩樂', '备忘', '備忘', '未分类', '未分類'
+  '人', '工作', '吃喝', '行', '住', '玩乐', '玩樂', '未分类', '未分類'
 ]);
 function normalizeTagCore(tag){
   const s=String(tag||'').trim();
@@ -2441,6 +2491,29 @@ function isBlockedOtherL1Option(tag){
   
   return false;
 }
+// 💡 判斷是否為文件夾相關標籤（包括一級大類和二級物理大類，如 "行"、"備忘"、"吃喝-午" 等）
+function isFolderRelatedTag(tag) {
+  const v = String(tag || '').trim();
+  if (!v) return false;
+  
+  // 1) 判斷是否為標準的物理二級分類標籤（如 "吃喝-午"、"人-自拍"）
+  if (isFolderCategoryTag(v)) return true;
+  
+  // 2) 判斷是否為一級大類的核心字眼（如 "吃喝"、"行"、"備忘" 等）
+  const core = normalizeTagCore(v);
+  if (FOLDER_L1_CORES.has(core) || FOLDER_L1_CORES.has(v)) return true;
+  
+  // 3) 判斷是否為帶斜槓的複合標籤，且其一級大類是物理大類（如 "吃喝/吃喝-午" 或 "行/自駕"）
+  const slash = v.indexOf('/');
+  if (slash !== -1) {
+    const l1 = v.slice(0, slash).trim();
+    const l1Core = normalizeTagCore(l1);
+    if (FOLDER_L1_CORES.has(l1) || FOLDER_L1_CORES.has(l1Core)) return true;
+  }
+  
+  return false;
+}
+
 function isFolderCategoryTag(tag){
   const v=String(tag||'').trim();
   if(!v) return false;
@@ -2676,18 +2749,24 @@ async function setPrimaryFolderCategoryTag(alb, folderTag){
   
   const nextTags = (alb.tags || []).filter(t => {
     const ts = String(t || '').trim();
-    if (effectiveRoles.includes(ts)) return true;
     
-    const isSecLevel = STANDARD_SECOND_LEVEL_FOLDERS.some(ft => {
-      if (ts === ft || ts.endsWith('/' + ft)) return true;
-      const info = parseFolderCategoryName(ft);
-      if (info?.parent) {
-        const target = `${info.parent}/${ft}`;
-        if (ts === target || ts.endsWith('/' + target)) return true;
-      }
+    // 💡 徹底清洗：凡是包含 "未分类" 或 "未分類" 的標籤，不論是單純的、帶前綴的還是斜槓複合的，一律清除
+    if (ts === '未分类' || ts === '未分類' || ts.includes('/未分类') || ts.includes('/未分類') || ts.startsWith('未分类/') || ts.startsWith('未分類/')) {
       return false;
-    });
-    return !isSecLevel;
+    }
+    
+    // 💡 判斷該標籤是否屬於一級或二級物理分類大類相關
+    if (isFolderRelatedTag(ts)) {
+      // 💡 只有當前相冊的角色大類 L1（如 "jovy_irwin"）需要保留
+      if (effectiveRoles.includes(ts)) {
+        return true;
+      }
+      // 其他舊的、混亂的一級或二級文件夾大類標籤一律清洗清除
+      return false;
+    }
+    
+    // 保留普通自定義標籤
+    return true;
   });
   
   const canonicalTags = buildCanonicalFolderCategoryTags(folderTag);
@@ -3520,18 +3599,56 @@ async function autoFixStaleAlbumFolderPaths() {
     if (!alb.handle) continue;
     
     const folderTag = getPrimaryFolderCategoryTag(alb);
-    if (!folderTag) continue;
-    
     const pathInfo = parseFolderRelPath(alb._folderRelPath || alb.name);
     const currentCategory = pathInfo.category || '未分类';
     
+    // 💡 檢查當前相冊所處的物理目錄（例如 备忘）是否屬於合法的物理大類
+    const isCurrentCategoryLegal = FOLDER_L1_CORES.has(normalizeTagCore(currentCategory));
+    
+    let targetFolderTag = folderTag;
+    // 如果該相冊目前處於一個非法的物理目錄下，且沒有被顯式標記其他合法的物理分類，則自動將其歸檔至 "未分类"
+    if (!targetFolderTag && !isCurrentCategoryLegal) {
+      targetFolderTag = '未分类';
+    }
+    
+    if (!targetFolderTag) continue;
+    
     // 如果物理路径所属的分类与当前的文件夹标签不一致，进行物理移动归位
-    if (currentCategory !== folderTag) {
+    if (currentCategory !== targetFolderTag) {
       try {
-        const moved = await moveAlbumFolderToCategory(alb, folderTag);
+        const moved = await moveAlbumFolderToCategory(alb, targetFolderTag);
         if (moved) {
           fixedCount++;
-          console.log(`[自动归档] 相册 "${alb.name}" 物理路径已由 "${currentCategory}" 修正并归档到 "${folderTag}"`);
+          console.log(`[自动归档] 相册 "${alb.name}" 物理路径已由 "${currentCategory}" 修正并归档到 "${targetFolderTag}"`);
+          
+          // 💡 物理搬移成功後，深度清洗舊的過期物理大類標籤（如 备忘），並寫入規範的新標籤
+          const cleanedTags = (alb.tags || []).filter(t => {
+            const ts = String(t || '').trim();
+            const tsCore = normalizeTagCore(ts);
+            if (tsCore === '备忘' || tsCore === '備忘') return false;
+            // 去除 L1/L2 複合殘留（如 备忘/备忘-IG）
+            const slash = ts.indexOf('/');
+            if (slash !== -1) {
+              const l1 = ts.slice(0, slash).trim();
+              if (normalizeTagCore(l1) === '备忘' || normalizeTagCore(l1) === '備忘') return false;
+            }
+            return true;
+          });
+          
+          // 寫入新規範標籤
+          const canonicalTags = buildCanonicalFolderCategoryTags(targetFolderTag);
+          canonicalTags.forEach(t => {
+            if (!cleanedTags.includes(t)) cleanedTags.push(t);
+          });
+          
+          alb.tags = cleanedTags;
+          
+          // 寫入新目錄下的 info.json，保證標籤狀態持久化
+          try {
+            await writeAlbumMetadata(alb);
+          } catch (e) {
+            console.error(`[自动归档] 重写相册 "${alb.name}" 标签失败:`, e);
+          }
         }
       } catch (e) {
         console.error(`[自动归档失败] 修正相册 "${alb.name}" 物理路径失败:`, e);
@@ -3889,7 +4006,16 @@ function buildL2Row(l1,l2counts,l3Map){
       block.appendChild(buildL3Row(tag,l3Map.get(tag)));
     }
   };
-  [...l2counts.entries()].filter(([t])=>t!==unclKey).sort((a,b)=>b[1]-a[1])
+  [...l2counts.entries()].filter(([t])=>{
+    if(t===unclKey) return false;
+    // 💡 防止 L1 平級標籤被誤顯示為 L2 子項：
+    // 若 tag 的「核心名」本身是一個 FOLDER_L1_CORES 大類，則跳過不渲染
+    const core = normalizeTagCore(t.includes('/') ? t.slice(t.indexOf('/')+1) : t);
+    if(FOLDER_L1_CORES.has(core) || FOLDER_L1_CORES.has(t)) return false;
+    // 同理：若 tag 本身是其他 L1（無斜線，且與當前 l1 不同），也跳過
+    if(!t.includes('/') && t !== l1) return false;
+    return true;
+  }).sort((a,b)=>b[1]-a[1])
     .forEach(([tag,cnt])=>mkL2Chip(tag,cnt,tag.split('/')[1],false));
   if(l2counts.has(unclKey)) mkL2Chip(unclKey,l2counts.get(unclKey),'未分类',true);
   return block;
@@ -3897,18 +4023,18 @@ function buildL2Row(l1,l2counts,l3Map){
 
 function buildFilterBar(){
   const l1Counts=new Map(),l2Map=new Map(),l3Map=new Map();
-  const folderTagSets=getFolderCategoryTagSets();
   S.albums.forEach(alb=>{
     const seenL1=new Set(),seenL2=new Set();
     const classifiedSuffixes=new Set();
     (alb.tags||[]).forEach(tag=>{
-      if(folderTagSets.parentTags.has(tag)||folderTagSets.childTags.has(tag)||folderTagSets.rawTags.has(tag)) return;
+      // 💡 过滤掉所有与文件夹（物理分类）相关的标签，使其不混入普通标签列表中
+      if(isFolderRelatedTag(tag)) return;
       const slash=tag.indexOf('/');
       if(slash===-1) return;
       classifiedSuffixes.add(tag.slice(slash+1));
     });
     (alb.tags||[]).forEach(tag=>{
-      if(folderTagSets.parentTags.has(tag)||folderTagSets.childTags.has(tag)||folderTagSets.rawTags.has(tag)) return;
+      if(isFolderRelatedTag(tag)) return;
       const slash=tag.indexOf('/');
       if(slash===-1){
         if(!classifiedSuffixes.has(tag)){
@@ -5190,8 +5316,63 @@ function renderTagEditor(alb, container){
 
   function refreshSug(){
     while(sugRow.children.length>1) sugRow.removeChild(sugRow.lastChild);
-    const hierarchyL1=getEffectiveHierarchy().map(g=>tagName(g.l1));
-    const remaining=[...autoDetectTags(alb),...getQuickTags(),...hierarchyL1]
+    
+    // 收集當前相冊擁有的所有 L1 大類的核心名稱
+    const hasL1 = (l1Name) => {
+      const normL1 = normalizeTagCore(l1Name);
+      return (alb.tags || []).some(t => {
+        const p = t.split('/');
+        return normalizeTagCore(p[0]) === normL1;
+      });
+    };
+
+    const hobbyL2 = [];
+    const targetCores = new Set(['愛好', '爱好', 'Hobby', '角度', 'Angle']);
+    
+    RECOMMENDED_CUSTOM_TAGS.forEach(g => {
+      const core = normalizeTagCore(tagName(g.l1));
+      if (targetCores.has(core)) {
+        const l1Name = tagName(g.l1);
+        
+        // 💡 角度/Angle 不受 hasL1 關聯限制（所有相冊隨時可以標記拍攝角度）；愛好/Hobby 則保留 hasL1 關聯限制（有該大類才推薦熱門 L2）
+        const isHobby = core === '愛好' || core === '爱好' || core === 'Hobby';
+        if (isHobby && !hasL1(l1Name)) return; 
+        
+        if (!g._dynamicL2) {
+          // 📸 角度：靜態 L2 子標籤（自拍、第一視角、擺拍、Vlog）
+          (g.children || []).forEach(child => {
+            const l2Name = tagName(child.l2);
+            hobbyL2.push(`${l1Name}/${l2Name}`);
+          });
+        } else {
+          // 😍 愛好：統計所有相冊中最常使用的該大類子標籤（前 4 名）
+          const l2Counter = {};
+          (S.albums || []).forEach(a => {
+            // 💡 角色隔離過濾：只統計與當前相冊相同角色的相冊標籤
+            const aRole = parseFolderRelPath(a._folderRelPath || a.name).role;
+            if (aRole !== curRole) return;
+
+            (a.tags || []).forEach(tag => {
+              if (tag.startsWith(l1Name + '/')) {
+                const sub = tag.slice(l1Name.length + 1).split('/')[0];
+                if (sub) {
+                  l2Counter[sub] = (l2Counter[sub] || 0) + 1;
+                }
+              }
+            });
+          });
+          Object.entries(l2Counter)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4)
+            .forEach(([sub]) => {
+              hobbyL2.push(`${l1Name}/${sub}`);
+            });
+        }
+      }
+    });
+
+    // 💡 建議欄只保留「角度」和「愛好」的常用二級標籤推薦，去除無關大類和關鍵字識別干擾
+    const remaining = [...hobbyL2]
       .filter((s,i,a)=>a.indexOf(s)===i)
       .filter(s=>!(alb.tags||[]).some(t=>t===s||t.startsWith(s+'/')||s.startsWith(t+'/')));
     remaining.forEach(tag=>{
@@ -5292,7 +5473,13 @@ function renderTagEditor(alb, container){
     dl1.innerHTML='';
     const l1s=new Set();
     
-    // 1) 收集系统内置的非文件夹分类大类
+    // 1) 收集自定義推薦標籤與物理大類
+    RECOMMENDED_CUSTOM_TAGS.forEach(g=>{
+      const n=tagName(g.l1);
+      if(!isBlockedOtherL1Option(n)){
+        l1s.add(n);
+      }
+    });
     getEffectiveHierarchy().forEach(g=>{
       const n=tagName(g.l1);
       if(!isBlockedOtherL1Option(n)){
@@ -5300,14 +5487,20 @@ function renderTagEditor(alb, container){
       }
     });
 
-    // 2) 收集所有相册中已用标签的非文件夹分类大类
-    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
-      const sl=tag.indexOf('/');
-      const v=sl===-1?tag:tag.slice(0,sl);
-      if(!isBlockedOtherL1Option(v)){
-        l1s.add(v);
-      }
-    }));
+        // 2) 收集同一個角色相冊中已用標籤的非文件夾分類大類
+    const curRole = parseFolderRelPath(alb._folderRelPath || alb.name).role;
+    S.albums.forEach(a=>{
+      const aRole = parseFolderRelPath(a._folderRelPath || a.name).role;
+      if (aRole !== curRole) return; // 💡 角色隔離過濾
+
+      (a.tags||[]).forEach(tag=>{
+        const sl=tag.indexOf('/');
+        const v=sl===-1?tag:tag.slice(0,sl);
+        if(!isBlockedOtherL1Option(v)){
+          l1s.add(v);
+        }
+      });
+    });
 
     [...l1s].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).forEach(v=>{
       const o=document.createElement('option');o.value=v;dl1.appendChild(o);
@@ -5320,13 +5513,18 @@ function renderTagEditor(alb, container){
     dl2.innerHTML='';
     if(!l1v) return;
     const l2s=new Set();
-    const grp=getEffectiveHierarchy().find(g=>tagName(g.l1)===l1v);
-    if(grp?.children) grp.children.forEach(c=>l2s.add(tagName(c.l2)));
-    S.albums.forEach(a=>(a.tags||[]).forEach(tag=>{
-      if(!tag.startsWith(l1v+'/')) return;
-      const l2part=tag.slice(l1v.length+1);
-      if(!l2part.includes('/')) l2s.add(l2part);
-    }));
+    const grp=RECOMMENDED_CUSTOM_TAGS.find(g=>tagName(g.l1)===l1v) || getEffectiveHierarchy().find(g=>tagName(g.l1)===l1v);
+          if(grp?.children) grp.children.forEach(c=>l2s.add(tagName(c.l2)));
+      S.albums.forEach(a=>{
+        const aRole = parseFolderRelPath(a._folderRelPath || a.name).role;
+        if (aRole !== curRole) return; // 💡 角色隔離過濾
+
+        (a.tags||[]).forEach(tag=>{
+          if(!tag.startsWith(l1v+'/')) return;
+          const l2part=tag.slice(l1v.length+1);
+          if(!l2part.includes('/')) l2s.add(l2part);
+        });
+      });
     l2s.forEach(v=>{const o=document.createElement('option');o.value=v;dl2.appendChild(o);});
   };
 
@@ -6205,7 +6403,15 @@ $('igOutput').addEventListener('input',()=>{
 });
 $('igSessionId').addEventListener('input',()=>{
   localStorage.setItem('ig-session-id',$('igSessionId').value);
+  if ($('igAddIgSessionId')) $('igAddIgSessionId').value = $('igSessionId').value;
 });
+// 💡 雙向綁定：當在彈窗內修改 Session ID 時，同步更新歡迎頁面的輸入框及本地緩存
+if ($('igAddIgSessionId')) {
+  $('igAddIgSessionId').addEventListener('input', () => {
+    localStorage.setItem('ig-session-id', $('igAddIgSessionId').value);
+    if ($('igSessionId')) $('igSessionId').value = $('igAddIgSessionId').value;
+  });
+}
 
 // ── Quick IG Update ───────────────────────────────────────────────────────
 (function(){
@@ -6344,6 +6550,12 @@ btnOpen.addEventListener('click',openFolder);
 $('btnWelcomeOpen').addEventListener('click',openFolder);
 btnBack.addEventListener('click',()=>{if(S.view==='album')goHome();});
 $('btnLBBack').addEventListener('click',closeLB);
+  // 💡 點擊卡片外部的毛玻璃背景時，自動執行返回關閉大圖
+  $('vLB').addEventListener('click', (e) => {
+    if (e.target === $('vLB')) {
+      closeLB();
+    }
+  });
 lbPrev.addEventListener('click',()=>lbMove(-1));
 lbNext.addEventListener('click',()=>lbMove(1));
 
@@ -6862,6 +7074,9 @@ function formatVideoTime(seconds) {
     const guess=S.rootName||alb?.name||'';
     $('igAddUser').value=guess;
     $('igAddXhsCookie').value=localStorage.getItem('xhs-cookie')||'';
+    // 💡 初始化彈窗中的 IG Session ID 欄位
+    const savedSid = localStorage.getItem('ig-session-id') || '';
+    if ($('igAddIgSessionId')) $('igAddIgSessionId').value = savedSid;
     // 轉換工具：預填當前開啟的資料夾路徑
     const folderPath=getCurrentFolderPath(alb);
     $('igAddFlatPath').value=folderPath;

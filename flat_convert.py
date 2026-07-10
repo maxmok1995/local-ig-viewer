@@ -19,7 +19,6 @@
     python flat_convert.py "F:/【Claire】/【Claire Moreno 】"
     python flat_convert.py "F:/【Claire】/【Claire Moreno 】" --dry-run
 """
-
 import re
 import sys
 import json
@@ -27,6 +26,7 @@ import shutil
 import argparse
 from pathlib import Path
 from datetime import datetime
+import _common
 
 IMG_EXT   = re.compile(r'\.(jpe?g|png|webp|heic|gif)$',  re.IGNORECASE)
 VIDEO_EXT = re.compile(r'\.(mp4|mov|avi|mkv|webm)$', re.IGNORECASE)
@@ -217,10 +217,7 @@ def convert_dir(directory: Path, dry_run: bool) -> tuple[int, int]:
                 'image_count': image_count,
                 'source':      'flat',
             }
-            (dest / 'meta.json').write_text(
-                json.dumps(meta, ensure_ascii=False, indent=2),
-                encoding='utf-8',
-            )
+            _common.save_meta_json(dest, meta)
 
         done += 1
 

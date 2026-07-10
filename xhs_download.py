@@ -63,9 +63,19 @@ def _require(pkg, install_name=None):
         return __import__(pkg)
     except ImportError:
         name = install_name or pkg
-        print(f"\n❌  缺少依赖包: {name}")
-        print(f"    请运行: pip install {name}\n")
-        sys.exit(1)
+        print(f"[依赖] 未找到 {name}，正在尝试自动安装...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", name],
+                check=True,
+                timeout=120
+            )
+            print(f"[依赖] {name} 安装成功，正在重新导入...")
+            return __import__(pkg)
+        except Exception as e:
+            print(f"\n❌  自动安装失败: {e}")
+            print(f"    请手动运行: pip install {name}\n")
+            sys.exit(1)
 
 
 def load_cookie():
