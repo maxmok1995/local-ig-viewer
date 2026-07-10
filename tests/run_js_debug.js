@@ -158,7 +158,7 @@ console.log("-> 設置 [行-航班] 清洗後的 tags:", JSON.stringify(nextTags
 const cleanedContainsDirty = nextTags.some(t => t.includes('未分类') || t.includes('未分類'));
 console.log("-> 清洗後是否還殘留 '未分类' 髒數據:", cleanedContainsDirty ? "❌ 失敗" : "✅ 成功 (完全清洗)");
 console.log("-> 是否成功保留自定義標籤 [自拍, 亞洲]:", (nextTags.includes('自拍') && nextTags.includes('亞洲')) ? "✅ 成功" : "❌ 失敗");
-console.log("-> 是否寫入新規範標籤 [行/行-航班]:", nextTags.includes('行/行-航班') ? "✅ 成功" : "❌ 失敗");
+console.log("-> 是否寫入新規範標籤 [行/航班]:", nextTags.includes('行/航班') ? "✅ 成功" : "❌ 失敗");
 
 // 4. 驗證首頁配置同步 (getEffectiveHierarchy)
 console.log("\\n【4. 首頁配置與推薦大類同步驗證】");
