@@ -131,7 +131,7 @@ const mockAlbum = {
   tags: ['未分类', '行', '未分类/行', '行/行-航班', '未分类/行/行-航班', '行-航班', '未分类/行-航班', '自拍', '亞洲']
 };
 
-console.log("-> 清洗前的原始 tags:", JSON.stringify(mockAlbum.tags));
+console.log("-> 清滑前的原始 tags:", JSON.stringify(mockAlbum.tags));
 
 // 模擬 setPrimaryFolderCategoryTag 中的清洗過程
 const effectiveRoles = [];
@@ -180,7 +180,5 @@ try {
 } catch (err) {
   console.error("❌ 執行 Debug 測試出錯:", err.message);
 } finally {
-  if (fs.existsSync(tempJsPath)) {
-    fs.unlinkSync(tempJsPath);
-  }
+  // 💡 暫時保留 temp_debug_run.js 供語法分析，不刪除它
 }
