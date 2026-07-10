@@ -2661,8 +2661,10 @@ function parseFolderRelPath(relPath) {
 function buildCanonicalFolderCategoryTags(folderTag){
   const info=parseFolderCategoryName(folderTag);
   if(!info?.parent||!info?.child) return [folderTag].filter(Boolean);
-  return [info.parent, `${info.parent}/${folderTag}`, folderTag];
+  return [`${info.parent}/${folderTag}`];
 }
+
+
 function getPrimaryFolderCategoryTag(alb){
   const tags=alb?.tags||[];
   const effectiveRoles = getEffectiveHierarchy()
@@ -2949,6 +2951,8 @@ function removeTag(alb, tag) {
   scheduleWrite(alb);
 }
 
+
+
 // 改名後自動更新所有卡片的標籤（helper）
 function renameTagOnAllAlbums(oldTag, newTag) {
   (S.albums||[]).forEach(alb=>{
@@ -3192,7 +3196,7 @@ async function materializeAlbumsFromIndexRecords(albumRecords, rootName){
       ||alb.firstImage
       ||(alb.photos.find(p=>!p.isVideo))
       ||alb.photos[0];
-    if(coverSrc) alb.coverUrl=URL.createObjectURL(coverSrc.file);
+    if(coverSrc) alb.coverUrl=safeCreateObjectURL(coverSrc.file);
 
     const fallbackTitle=alb._looseSingle
       ? alb.photos[0]?.name.replace(/\.\w+$/,'')
@@ -4780,7 +4784,7 @@ function buildCard(alb,idx,total){
     const coverSrc=alb.firstImage||(alb.photos.find(p=>!p.isVideo))||alb.photos[0];
     if(coverSrc?.isVideo){
       if(coverSrc.poster?.file){
-        if(!coverSrc.poster.url) coverSrc.poster.url=URL.createObjectURL(coverSrc.poster.file);
+        if(!coverSrc.poster.url) coverSrc.poster.url=safeCreateObjectURL(coverSrc.poster.file);
         const img=document.createElement('img');img.src=coverSrc.poster.url;img.loading='lazy';
         card.appendChild(img);
       }else{
@@ -4964,7 +4968,7 @@ function renderHomePhotoGrid(container){
           const img=document.createElement('img');
           const obs=new IntersectionObserver(e=>{
             if(e[0].isIntersecting){
-              if(!photo.poster.url) photo.poster.url=URL.createObjectURL(photo.poster.file);
+              if(!photo.poster.url) photo.poster.url=safeCreateObjectURL(photo.poster.file);
               img.src=photo.poster.url;obs.disconnect();
             }
           },{rootMargin:'200px'});
@@ -4975,7 +4979,7 @@ function renderHomePhotoGrid(container){
           vid.preload='metadata';vid.muted=true;vid.playsInline=true;vid.disablePictureInPicture=true;vid.autoplay=true;vid.loop=true;
           const obs=new IntersectionObserver(e=>{
             if(e[0].isIntersecting){
-              if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+              if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
               vid.src=photo.url;
               vid.addEventListener('loadeddata',()=>{
                 try{vid.currentTime=0.01;}catch{}
@@ -4991,7 +4995,7 @@ function renderHomePhotoGrid(container){
         const img=document.createElement('img');
         const obs=new IntersectionObserver(e=>{
           if(e[0].isIntersecting){
-            if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+            if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
             img.src=photo.url;obs.disconnect();
           }
         },{rootMargin:'200px'});
@@ -5702,12 +5706,12 @@ function renderAlbum(alb){
       const vid=document.createElement('video');
       vid.controls=true;vid.playsInline=true;
       if(photo.poster){
-        if(!photo.poster.url) photo.poster.url=URL.createObjectURL(photo.poster.file);
+        if(!photo.poster.url) photo.poster.url=safeCreateObjectURL(photo.poster.file);
         vid.poster=photo.poster.url;
       }
       const obs=new IntersectionObserver(entries=>{
         if(entries[0].isIntersecting){
-          if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+          if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
           vid.src=photo.url;obs.disconnect();
         }
       },{rootMargin:'300px'});
@@ -5718,7 +5722,7 @@ function renderAlbum(alb){
       img.style.cssText='min-height:180px;background:#0a0a0a';
       const obs=new IntersectionObserver(entries=>{
         if(entries[0].isIntersecting){
-          if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+          if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
           img.src=photo.url;obs.disconnect();
         }
       },{rootMargin:'300px'});
@@ -5801,10 +5805,10 @@ function renderLB(){
   const shotWrap=$('lbVideoShotWrap');
   const clipWrap=$('lbVideoClipWrap');
   if(photo.isVideo){
-    if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+    if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
     if(lbVid.src!==photo.url){lbVid.src=photo.url;}
     if(photo.poster){
-      if(!photo.poster.url) photo.poster.url=URL.createObjectURL(photo.poster.file);
+      if(!photo.poster.url) photo.poster.url=safeCreateObjectURL(photo.poster.file);
       lbVid.poster=photo.poster.url;
     }
     lbImg.style.display='none';lbVid.style.display='';
@@ -5824,7 +5828,7 @@ function renderLB(){
     }
   } else {
     lbVid.pause();lbVid.style.display='none';lbVid.src='';
-    if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+    if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
     lbImg.src=photo.url;lbImg.style.display='';
     if(shotWrap) shotWrap.style.display='none';
     if(clipWrap) clipWrap.style.display='none';
@@ -7342,7 +7346,7 @@ async function renderMapView(){
         const fh=await S.rootDirHandle.getDirectoryHandle(alb.name);
         const ph=await fh.getFileHandle(photo.filename);
         const f=await ph.getFile();
-        img.src=URL.createObjectURL(f);
+        img.src=safeCreateObjectURL(f);
       }catch{}
     });
   });
@@ -7651,7 +7655,7 @@ function renderAlbumGrid(alb){
       const obs=new IntersectionObserver(e=>{
         if(e[0].isIntersecting){
           if(photo.thumbUrl){ img.src=photo.thumbUrl; obs.disconnect(); return; }
-          if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+          if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
           const v=document.createElement('video');
           v.preload='metadata'; v.muted=true; v.playsInline=true; v.src=photo.url;
           const done=()=>{ try{ v.src=''; }catch{} };
@@ -7682,7 +7686,7 @@ function renderAlbumGrid(alb){
       const obs=new IntersectionObserver(e=>{
         if(e[0].isIntersecting){
           const src=photo.isVideo&&photo.poster?photo.poster:photo;
-          if(!src.url) src.url=URL.createObjectURL(src.file);
+          if(!src.url) src.url=safeCreateObjectURL(src.file);
           img.src=src.url;obs.disconnect();
         }
       },{rootMargin:'200px'});
@@ -7719,7 +7723,7 @@ function renderAlbumGrid(alb){
           :(alb.firstImage||(alb.photos.find(p=>!p.isVideo))||alb.photos[0]);
         if(newCoverSrc){
           if(alb.coverUrl) URL.revokeObjectURL(alb.coverUrl);
-          alb.coverUrl=URL.createObjectURL(newCoverSrc.file);
+          alb.coverUrl=safeCreateObjectURL(newCoverSrc.file);
         }
         toast(newCover?`📌 封面已設為 ${newCover}`:'封面已重置',1800);
         renderAlbumGrid(alb);
@@ -7828,6 +7832,19 @@ function fmtNum(n){
 function esc(s){
   return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
+
+// 💡 安全的 URL.createObjectURL 包裝器，防止當 File 對象為空/無效時拋出異常崩潰
+function safeCreateObjectURL(file) {
+  if (!file) return '';
+  try {
+    if (file instanceof Blob || file instanceof File) {
+      return safeCreateObjectURL(file);
+    }
+  } catch (err) {
+    console.error("safeCreateObjectURL failed:", err);
+  }
+  return '';
+}
 // 搜尋結果高亮（遞歸，支持多處命中）
 function hlText(text,q){
   if(!q||!text) return esc(text||'');
@@ -7931,7 +7948,7 @@ function copyPhotoPath(alb,photo){
   });
 }
 function viewPhoto(alb,photo){
-  if(!photo.url) photo.url=URL.createObjectURL(photo.file);
+  if(!photo.url) photo.url=safeCreateObjectURL(photo.file);
   window.open(photo.url,'_blank');
 }
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
@@ -8024,7 +8041,7 @@ function renderMoveList(q){
     thumb.className='moveAlbumThumb';
     if(alb.firstImage){
       const img=document.createElement('img');
-      if(!alb.firstImage.url) alb.firstImage.url=URL.createObjectURL(alb.firstImage.file);
+      if(!alb.firstImage.url) alb.firstImage.url=safeCreateObjectURL(alb.firstImage.file);
       img.src=alb.firstImage.url;
       thumb.appendChild(img);
     } else {
@@ -8106,7 +8123,7 @@ async function doMovePhoto(srcAlb,photo,destAlb){
     if(!destAlb.firstImage&&!newPhoto.isVideo) destAlb.firstImage=newPhoto;
     if(!destAlb.coverUrl){
       const coverSrc=destAlb.firstImage||newPhoto;
-      if(coverSrc) destAlb.coverUrl=URL.createObjectURL(coverSrc.file);
+      if(coverSrc) destAlb.coverUrl=safeCreateObjectURL(coverSrc.file);
     }
 
     // 5. 从源相册移除
@@ -8228,7 +8245,7 @@ function exportBackup(){
   };
   const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
+  a.href=safeCreateObjectURL(blob);
   const date=new Date().toISOString().slice(0,10);
   a.download=`local-ig-backup-${S.rootName||'all'}-${date}.json`;
   a.click();
